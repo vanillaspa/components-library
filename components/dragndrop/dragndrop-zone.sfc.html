@@ -1,0 +1,69 @@
+<template>
+    <div class="zone-container">
+        <slot></slot>
+    </div>
+</template>
+<script>
+    const { addEventListener } = window.eventbus;
+    const dropZone = shadowDocument.host;
+    const slot = shadowDocument.querySelector('slot');
+
+    addEventListener('dragndrop:drop', (event) => {
+        const { item, targetZone } = event.detail;
+        if (targetZone === dropZone) {
+            dropZone.appendChild(item);
+            dropZone.classList.remove('drag-over');
+        }
+    }, dropZone);
+
+    dropZone.addEventListener("dragover", (event) => {
+        dropZone.classList.add('drag-over');
+    });
+
+    dropZone.addEventListener("dragleave", (event) => {
+        dropZone.classList.remove('drag-over');
+    });
+
+    slot.addEventListener("slotchange", (event) => {
+        if (dropZone.querySelector("dragndrop-item")) {
+            dropZone.classList.remove("empty");
+        } else {
+            dropZone.classList.add("empty");
+        }
+    });
+</script>
+<style>
+    :host {
+        display: block;
+        min-height: 100px;
+        border: 2px dashed #ccc;
+        border-radius: 8px;
+        padding: 20px;
+        margin: 20px 0;
+        background: white;
+        transition: all 0.3s ease;
+        position: relative;
+    }
+
+    :host(.drag-over) {
+        border-color: #4CAF50;
+        background: #f0f8f0;
+    }
+
+    :host([data-zone="source"]) {
+        border-color: #2196F3;
+    }
+
+    :host([data-zone="source"].drag-over) {
+        border-color: #1976D2;
+        background: #f0f7ff;
+    }
+
+    .zone-container {
+        min-height: 60px;
+    }
+
+    :host(.empty) ::slotted([slot="content"]) {
+        display: none;
+    }
+</style>

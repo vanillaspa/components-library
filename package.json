@@ -1,0 +1,29 @@
+{
+  "name": "@vanillaspa/components-library",
+  "version": "0.0.4",
+  "description": "This is a library for @vanillspa/web-components",
+  "keywords": [
+    "CSS",
+    "CustomElements",
+    "HTML",
+    "JavaScript",
+    "SFC",
+    "vanilla",
+    "WebComponents"
+  ],
+  "homepage": "https://github.com/vanillaspa/components-library#readme",
+  "bugs": {
+    "url": "https://github.com/vanillaspa/components-library/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vanillaspa/components-library.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "license": "Unlicense",
+  "author": "Robert Meissner <rome@live.com>",
+  "type": "module",
+  "main": "index.js"
+}

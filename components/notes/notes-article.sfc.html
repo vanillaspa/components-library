@@ -1,0 +1,59 @@
+<script>
+    let note = JSON.parse(shadowDocument.host.dataset.state);
+    const article = { id: note.id, title: note.title, note: note.note, createdAt: note.created_at, updatedAt: note.updated_at }
+    const h3 = shadowDocument.querySelector("h3");
+    h3.innerHTML = article.title;
+    const p = shadowDocument.querySelector("p");
+    p.innerHTML = article.note;
+</script>
+
+<template>
+    <article>
+        <h3></h3>
+        <p></p>
+        <span>note</span>
+    </article>
+</template>
+
+<style>
+    :host {
+        flex: 1 1 calc(50% - 5px);
+    }
+
+    article {
+        background: radial-gradient(circle, rgba(255, 255, 0, .8) 0%, rgba(255, 215, 0, .8) 100%);
+        box-shadow: 2px 2px 10px #ffd700;
+        border-radius: 4px;
+        height: 100%;
+        padding: 8px;
+        margin: 8px 0 !important;
+
+        h3 {
+            color: #144000;
+            display: block;
+            padding-bottom: 4px;
+        }
+
+        p {
+            color: #144000;
+            padding-bottom: 16px;
+
+            a {
+                color: blue;
+            }
+        }
+
+        span {
+            background-color: darkslategray;
+            border-radius: 4px;
+            color: antiquewhite;
+            padding: 4px;
+        }
+    }
+
+    @media only screen and (min-width: 600px) {
+        :host {
+            flex: 1 1 calc(50% - 10px);
+        }
+    }
+</style>

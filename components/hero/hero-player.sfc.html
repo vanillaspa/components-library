@@ -1,0 +1,141 @@
+<template>
+    <div class="card">
+        <div class="avatar">🧙</div>
+        <div class="name-row">
+            <span id="p-name"></span>
+            <span id="p-level" class="badge-level"></span>
+        </div>
+        <div id="p-floor" class="floor-label"></div>
+
+        <div class="stat-block">
+            <label>HP</label>
+            <div class="bar-track"><div id="p-hp-bar" class="bar-fill ok"></div></div>
+            <span id="p-hp-text" class="bar-lbl"></span>
+        </div>
+        <div class="stat-block">
+            <label>XP</label>
+            <div class="bar-track"><div id="p-xp-bar" class="bar-fill xp"></div></div>
+            <span id="p-xp-text" class="bar-lbl"></span>
+        </div>
+
+        <div class="stats-row">
+            <div class="stat"><span>⚔️</span><span id="p-atk"></span></div>
+            <div class="stat"><span>🛡️</span><span id="p-def"></span></div>
+            <div class="stat"><span>🪙</span><span id="p-gold"></span></div>
+        </div>
+    </div>
+</template>
+
+<script>
+    const { addEventListener: busListen } = window.eventbus;
+    const { notifications } = window.HeroContract;
+    const host    = shadowDocument.host;
+    const nameEl  = shadowDocument.getElementById('p-name');
+    const levelEl = shadowDocument.getElementById('p-level');
+    const floorEl = shadowDocument.getElementById('p-floor');
+    const hpBar   = shadowDocument.getElementById('p-hp-bar');
+    const hpText  = shadowDocument.getElementById('p-hp-text');
+    const xpBar   = shadowDocument.getElementById('p-xp-bar');
+    const xpText  = shadowDocument.getElementById('p-xp-text');
+    const atkEl   = shadowDocument.getElementById('p-atk');
+    const defEl   = shadowDocument.getElementById('p-def');
+    const goldEl  = shadowDocument.getElementById('p-gold');
+
+    busListen(notifications.STATE, (e) => {
+        const { hero, floor } = e.detail;
+        nameEl.textContent  = hero.name;
+        levelEl.textContent = `Lv ${hero.level}`;
+        floorEl.textContent = `Floor ${floor}`;
+
+        const hpPct = Math.max(0, (hero.hp / hero.maxHp) * 100);
+        hpBar.style.width  = `${hpPct}%`;
+        hpBar.className    = 'bar-fill' + (hpPct < 30 ? ' danger' : hpPct < 60 ? ' warn' : ' ok');
+        hpText.textContent = `${hero.hp}/${hero.maxHp}`;
+
+        const xpPct = Math.min(100, (hero.xp / hero.xpNext) * 100);
+        xpBar.style.width  = `${xpPct}%`;
+        xpText.textContent = `${hero.xp}/${hero.xpNext}`;
+
+        atkEl.textContent  = hero.attack;
+        defEl.textContent  = hero.defense;
+        goldEl.textContent = hero.gold;
+    }, host);
+</script>
+
+<style>
+    :host { display: block; }
+
+    .card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.45rem;
+        color: #e0e0e0;
+    }
+
+    .avatar { font-size: 2.8rem; filter: drop-shadow(0 0 6px #ffd70066); }
+
+    .name-row {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-weight: 700;
+        font-size: 1rem;
+        color: #ffd700;
+    }
+
+    .badge-level {
+        background: #e94560;
+        color: #fff;
+        font-size: 0.7rem;
+        padding: 0.1rem 0.4rem;
+        border-radius: 999px;
+        font-weight: 600;
+    }
+
+    .floor-label { font-size: 0.72rem; color: #888; }
+
+    .stat-block {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 22px 1fr 54px;
+        align-items: center;
+        gap: 0.35rem;
+        font-size: 0.75rem;
+    }
+
+    label { color: #aaa; font-weight: 600; }
+
+    .bar-track {
+        background: #0d0d1a;
+        border-radius: 999px;
+        height: 9px;
+        overflow: hidden;
+        border: 1px solid #333;
+    }
+
+    .bar-fill { height: 100%; border-radius: 999px; transition: width 0.3s ease; }
+    .bar-fill.ok     { background: #4caf50; }
+    .bar-fill.warn   { background: #ffc107; }
+    .bar-fill.danger { background: #e94560; }
+    .bar-fill.xp     { background: #3b82f6; }
+
+    .bar-lbl { font-size: 0.68rem; color: #aaa; text-align: right; white-space: nowrap; }
+
+    .stats-row { display: flex; gap: 0.5rem; margin-top: 0.2rem; }
+
+    .stat {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background: #0d0d1a;
+        border: 1px solid #334;
+        border-radius: 0.375rem;
+        padding: 0.3rem 0.5rem;
+        min-width: 42px;
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: #ffd700;
+        gap: 0.1rem;
+    }
+</style>

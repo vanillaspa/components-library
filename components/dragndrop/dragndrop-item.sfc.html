@@ -1,0 +1,92 @@
+<template>
+    <!-- Draggable Item Custom Element with Shadow DOM and Slots -->
+    <slot></slot>
+</template>
+
+<script>
+    const { dispatchEvent } = window.eventbus;
+    const element = shadowDocument.host;
+    element.draggable = true;
+
+    function handleDragStart(event) {
+        setTimeout(() => element.classList.add("dragging"), 0);
+        dispatchEvent(new CustomEvent('dragndrop:start', {
+            detail: { item: element, sourceZone: element.parentElement }
+        }));
+    }
+    function handleDragEnd(event) {
+        const targetZone = findZoneFromPoint(event.clientX, event.clientY);
+        if (targetZone) {
+            dispatchEvent(new CustomEvent('dragndrop:drop', {
+                detail: { item: element, targetZone }
+            }));
+        }
+        setTimeout(() => element.classList.remove('dragging'), 0);
+    }
+    function handleTouchStart(touchEvent) {
+        if (touchEvent.touches.length === 1) {
+            setTimeout(() => element.classList.add('dragging'), 0);
+            dispatchEvent(new CustomEvent('dragndrop:start', {
+                detail: { item: element, sourceZone: element.parentElement }
+            }));
+        }
+    }
+    function handleTouchEnd(event) {
+        const targetZone = findZoneFromPoint(event.changedTouches[0].clientX, event.changedTouches[0].clientY);
+        if (targetZone) {
+            dispatchEvent(new CustomEvent('dragndrop:drop', {
+                detail: { item: element, targetZone }
+            }));
+        }
+        setTimeout(() => element.classList.remove('dragging'), 0);
+    }
+    function findZoneFromPoint(x, y) {
+        let el = document.elementFromPoint(x, y);
+        while (el && el.shadowRoot) {
+            const nextEl = el.shadowRoot.elementFromPoint(x, y);
+            if (nextEl && nextEl !== el) {
+                if (el.tagName === 'DRAGNDROP-ZONE') break;
+                el = nextEl;
+            } else {
+                break;
+            }
+        }
+        return el?.tagName === 'DRAGNDROP-ZONE' ? el : null;
+    }
+
+    element.addEventListener("dragstart", handleDragStart);
+    element.addEventListener('dragend', handleDragEnd);
+    if ('ontouchstart' in window) {
+        element.addEventListener('touchstart', handleTouchStart);
+        element.addEventListener('touchend', handleTouchEnd);
+    }
+</script>
+
+<style>
+    :host {
+        display: inline-block;
+        padding: 10px 15px;
+        margin: 5px;
+        background: var(--drag-item-bg, #4CAF50);
+        color: var(--drag-item-color, white);
+        border-radius: 4px;
+        cursor: grab;
+        user-select: none;
+        transition: opacity 0.2s ease;
+    }
+
+    :host(:active) {
+        cursor: grabbing;
+    }
+
+    :host(.dragging) {
+        opacity: 0.5;
+        /* background: red; */
+    }
+
+    .content {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+</style>

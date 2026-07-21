@@ -1,0 +1,562 @@
+<template>
+    <div class="container">
+        <header>
+            <h1>Personal Activity Tracker</h1>
+            <p class="subtitle">A demonstration of ethical data tracking using Origin Private File System (OPFS)</p>
+        </header>
+
+        <div class="privacy-notice">
+            <h3>🔒 Privacy Notice</h3>
+            <p>This application stores your activity data locally in your browser using OPFS. Your data never leaves your device and is completely private to you. You can clear this data at any time through your browser settings.</p>
+        </div>
+
+        <div class="tracking-section">
+            <h2>Track Your Activities</h2>
+            <div class="activity-form">
+                <input type="text" id="activityInput" placeholder="What activity did you do? (e.g., 'Read for 30 minutes')" maxlength="100">
+                <button id="trackButton">Track Activity</button>
+            </div>
+        </div>
+
+        <div class="data-section">
+            <h2>Your Tracked Activities</h2>
+            <div class="controls">
+                <button id="viewDataButton">View All Data</button>
+                <button id="clearDataButton" class="danger">Clear All Data</button>
+                <button id="exportDataButton">Export Data</button>
+            </div>
+            <div id="dataDisplay" class="data-display"></div>
+        </div>
+
+        <div class="stats-section">
+            <h2>Statistics</h2>
+            <div id="statsDisplay" class="stats-display">
+                <div class="stat-item">
+                    <span class="stat-label">Total Activities:</span>
+                    <span id="totalActivities" class="stat-value">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Today's Activities:</span>
+                    <span id="todayActivities" class="stat-value">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Storage Used:</span>
+                    <span id="storageUsed" class="stat-value">0 KB</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-section">
+            <h2>About This Demo</h2>
+            <p>This application demonstrates how to use the Origin Private File System (OPFS) for storing user data ethically and transparently. Key principles:</p>
+            <ul>
+                <li><strong>User Consent:</strong> You explicitly choose what to track</li>
+                <li><strong>Transparency:</strong> You can view all stored data</li>
+                <li><strong>Control:</strong> You can export or delete your data anytime</li>
+                <li><strong>Privacy:</strong> Data stays on your device only</li>
+            </ul>
+        </div>
+    </div>
+</template>
+<style>
+:host {
+    background-color: white;
+}
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 10px;
+}
+
+header h1 {
+    font-size: 2.5em;
+    margin-bottom: 10px;
+}
+
+.subtitle {
+    font-size: 1.1em;
+    opacity: 0.9;
+}
+
+.privacy-notice {
+    background-color: #e8f5e8;
+    border: 2px solid #4caf50;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 30px;
+}
+
+.privacy-notice h3 {
+    color: #2e7d32;
+    margin-bottom: 10px;
+}
+
+.tracking-section,
+.data-section,
+.stats-section,
+.info-section {
+    background: white;
+    padding: 25px;
+    margin-bottom: 20px;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.tracking-section h2,
+.data-section h2,
+.stats-section h2,
+.info-section h2 {
+    margin-bottom: 20px;
+    color: #444;
+    border-bottom: 2px solid #667eea;
+    padding-bottom: 10px;
+}
+
+.activity-form {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+#activityInput {
+    flex: 1;
+    padding: 12px;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    font-size: 16px;
+}
+
+#activityInput:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+button {
+    padding: 12px 20px;
+    border: none;
+    border-radius: 6px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+#trackButton {
+    background-color: #667eea;
+    color: white;
+}
+
+#trackButton:hover {
+    background-color: #5a6fd8;
+}
+
+#trackButton:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+.controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+#viewDataButton {
+    background-color: #4caf50;
+    color: white;
+}
+
+#viewDataButton:hover {
+    background-color: #45a049;
+}
+
+#exportDataButton {
+    background-color: #2196f3;
+    color: white;
+}
+
+#exportDataButton:hover {
+    background-color: #1976d2;
+}
+
+.danger {
+    background-color: #f44336;
+    color: white;
+}
+
+.danger:hover {
+    background-color: #d32f2f;
+}
+
+.data-display {
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 15px;
+    background-color: #fafafa;
+}
+
+.activity-item {
+    padding: 10px;
+    margin-bottom: 10px;
+    background: white;
+    border-radius: 6px;
+    border-left: 4px solid #667eea;
+}
+
+.activity-timestamp {
+    font-size: 0.9em;
+    color: #666;
+    margin-bottom: 5px;
+}
+
+.activity-text {
+    font-weight: 500;
+}
+
+.stats-display {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+}
+
+.stat-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+    border-radius: 8px;
+}
+
+.stat-label {
+    font-weight: 500;
+}
+
+.stat-value {
+    font-size: 1.2em;
+    font-weight: bold;
+}
+
+.info-section ul {
+    margin-left: 20px;
+}
+
+.info-section li {
+    margin-bottom: 8px;
+}
+
+.error-message {
+    background-color: #ffebee;
+    color: #c62828;
+    padding: 10px;
+    border-radius: 6px;
+    margin-bottom: 15px;
+    border: 1px solid #ef5350;
+}
+
+.success-message {
+    background-color: #e8f5e8;
+    color: #2e7d32;
+    padding: 10px;
+    border-radius: 6px;
+    margin-bottom: 15px;
+    border: 1px solid #4caf50;
+}
+
+@media (max-width: 600px) {
+    .container {
+        padding: 10px;
+    }
+    
+    .activity-form {
+        flex-direction: column;
+    }
+    
+    .controls {
+        flex-direction: column;
+    }
+    
+    .stats-display {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+<script>
+// Personal Activity Tracker using OPFS
+// This demonstrates ethical data tracking with user consent and transparency
+
+class OPFSTracker {
+    constructor() {
+        this.dataFileName = 'activities.json';
+        this.activities = [];
+        this.init();
+    }
+
+    async init() {
+        try {
+            // Check if OPFS is supported
+            if (!('storage' in navigator) || !('getDirectory' in navigator.storage)) {
+                this.showError('Origin Private File System (OPFS) is not supported in this browser. Please use a modern browser like Chrome, Edge, or Firefox.');
+                return;
+            }
+
+            // Load existing data
+            await this.loadData();
+            this.updateStats();
+            this.bindEvents();
+            this.showSuccess('Application initialized successfully. Your data is stored privately in your browser.');
+        } catch (error) {
+            console.error('Initialization error:', error);
+            this.showError('Failed to initialize the application: ' + error.message);
+        }
+    }
+
+    bindEvents() {
+        const trackButton = shadowDocument.getElementById('trackButton');
+        const activityInput = shadowDocument.getElementById('activityInput');
+        const viewDataButton = shadowDocument.getElementById('viewDataButton');
+        const clearDataButton = shadowDocument.getElementById('clearDataButton');
+        const exportDataButton = shadowDocument.getElementById('exportDataButton');
+
+        trackButton.addEventListener('click', () => this.trackActivity());
+        activityInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                this.trackActivity();
+            }
+        });
+        viewDataButton.addEventListener('click', () => this.displayData());
+        clearDataButton.addEventListener('click', () => this.clearAllData());
+        exportDataButton.addEventListener('click', () => this.exportData());
+    }
+
+    async getOPFSRoot() {
+        return await navigator.storage.getDirectory();
+    }
+
+    async loadData() {
+        try {
+            const opfsRoot = await this.getOPFSRoot();
+            
+            try {
+                const fileHandle = await opfsRoot.getFileHandle(this.dataFileName);
+                const file = await fileHandle.getFile();
+                const text = await file.text();
+                
+                if (text.trim()) {
+                    this.activities = JSON.parse(text);
+                } else {
+                    this.activities = [];
+                }
+            } catch (error) {
+                // File doesn't exist yet, start with empty array
+                this.activities = [];
+            }
+        } catch (error) {
+            console.error('Error loading data:', error);
+            this.activities = [];
+        }
+    }
+
+    async saveData() {
+        try {
+            const opfsRoot = await this.getOPFSRoot();
+            const fileHandle = await opfsRoot.getFileHandle(this.dataFileName, { create: true });
+            const writable = await fileHandle.createWritable();
+            
+            await writable.write(JSON.stringify(this.activities, null, 2));
+            await writable.close();
+            
+            return true;
+        } catch (error) {
+            console.error('Error saving data:', error);
+            this.showError('Failed to save data: ' + error.message);
+            return false;
+        }
+    }
+
+    async trackActivity() {
+        const activityInput = shadowDocument.getElementById('activityInput');
+        const activity = activityInput.value.trim();
+
+        if (!activity) {
+            this.showError('Please enter an activity to track.');
+            return;
+        }
+
+        const activityData = {
+            id: Date.now(),
+            text: activity,
+            timestamp: new Date().toISOString(),
+            date: new Date().toDateString()
+        };
+
+        this.activities.unshift(activityData); // Add to beginning of array
+
+        const saved = await this.saveData();
+        if (saved) {
+            activityInput.value = '';
+            this.updateStats();
+            this.showSuccess(`Activity tracked: "${activity}"`);
+        }
+    }
+
+    displayData() {
+        const dataDisplay = shadowDocument.getElementById('dataDisplay');
+        
+        if (this.activities.length === 0) {
+            dataDisplay.innerHTML = '<p>No activities tracked yet. Start by adding an activity above!</p>';
+            return;
+        }
+
+        const activitiesHTML = this.activities.map(activity => `
+            <div class="activity-item">
+                <div class="activity-timestamp">${new Date(activity.timestamp).toLocaleString()}</div>
+                <div class="activity-text">${this.escapeHtml(activity.text)}</div>
+            </div>
+        `).join('');
+
+        dataDisplay.innerHTML = activitiesHTML;
+    }
+
+    async clearAllData() {
+        if (!confirm('Are you sure you want to delete all tracked activities? This action cannot be undone.')) {
+            return;
+        }
+
+        try {
+            const opfsRoot = await this.getOPFSRoot();
+            await opfsRoot.removeEntry(this.dataFileName);
+            this.activities = [];
+            this.updateStats();
+            shadowDocument.getElementById('dataDisplay').innerHTML = '<p>All data has been cleared.</p>';
+            this.showSuccess('All activity data has been deleted.');
+        } catch (error) {
+            if (error.name === 'NotFoundError') {
+                // File doesn't exist, which is fine
+                this.activities = [];
+                this.updateStats();
+                this.showSuccess('All activity data has been cleared.');
+            } else {
+                console.error('Error clearing data:', error);
+                this.showError('Failed to clear data: ' + error.message);
+            }
+        }
+    }
+
+    exportData() {
+        if (this.activities.length === 0) {
+            this.showError('No data to export.');
+            return;
+        }
+
+        const exportData = {
+            exportDate: new Date().toISOString(),
+            totalActivities: this.activities.length,
+            activities: this.activities
+        };
+
+        const dataStr = JSON.stringify(exportData, null, 2);
+        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+        
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(dataBlob);
+        link.download = `activity-data-${new Date().toISOString().split('T')[0]}.json`;
+        link.click();
+        
+        this.showSuccess('Data exported successfully!');
+    }
+
+    updateStats() {
+        const totalActivities = this.activities.length;
+        const today = new Date().toDateString();
+        const todayActivities = this.activities.filter(activity => activity.date === today).length;
+        
+        shadowDocument.getElementById('totalActivities').textContent = totalActivities;
+        shadowDocument.getElementById('todayActivities').textContent = todayActivities;
+        
+        // Calculate approximate storage used
+        const dataSize = JSON.stringify(this.activities).length;
+        const sizeKB = (dataSize / 1024).toFixed(2);
+        shadowDocument.getElementById('storageUsed').textContent = `${sizeKB} KB`;
+    }
+
+    showError(message) {
+        this.showMessage(message, 'error');
+    }
+
+    showSuccess(message) {
+        this.showMessage(message, 'success');
+    }
+
+    showMessage(message, type) {
+        // Remove existing messages
+        const existingMessages = shadowDocument.querySelectorAll('.error-message, .success-message');
+        existingMessages.forEach(msg => msg.remove());
+
+        const messageDiv = document.createElement('div');
+        messageDiv.className = type === 'error' ? 'error-message' : 'success-message';
+        messageDiv.textContent = message;
+
+        const container = shadowDocument.querySelector('.container');
+        container.insertBefore(messageDiv, container.firstChild);
+
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            if (messageDiv.parentNode) {
+                messageDiv.remove();
+            }
+        }, 5000);
+    }
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+}
+
+// Initialize the application when the page loads
+// $.addEventListener('DOMContentLoaded', () => {});
+
+new OPFSTracker();
+
+// Add some utility functions for debugging
+window.debugOPFS = {
+    async listFiles() {
+        try {
+            const opfsRoot = await navigator.storage.getDirectory();
+            console.log(opfsRoot)
+            const entries = [];
+            for await (const [name, handle] of opfsRoot.entries()) {
+                entries.push({ name, kind: handle.kind });
+            }
+            console.log('OPFS Files:', entries);
+            return entries;
+        } catch (error) {
+            console.error('Error listing files:', error);
+        }
+    },
+
+    async getStorageEstimate() {
+        try {
+            const estimate = await navigator.storage.estimate();
+            console.log('Storage Estimate:', estimate);
+            return estimate;
+        } catch (error) {
+            console.error('Error getting storage estimate:', error);
+        }
+    }
+};
+</script>

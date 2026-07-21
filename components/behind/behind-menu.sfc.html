@@ -1,0 +1,38 @@
+<template>
+    <a href="/">
+        <h1>JAHRO.ME</h1>
+    </a>
+</template>
+<style>
+    :host {
+        position: absolute;
+        top: 0;
+        border-radius: 50%;
+        border: none;
+        height: 150px;
+        margin: 20px;
+        box-sizing: border-box;
+        width: calc(100vw - 40px);
+        box-shadow: 0px 0px 50px 20px #426600 inset;
+        box-shadow: 0px 0px 50px 20px #426600;
+        line-height: 120px;
+        text-align: center;
+    }
+
+    a {
+        text-decoration: none;
+        color: #ffd700;
+        transition: text-shadow .2s ease-in;
+
+        &:hover {
+            text-decoration: underline;
+            text-shadow: 0px 0px 3px #ffd700;
+        }
+    }
+
+    @media only screen and (min-width: 600px) {
+        :host {
+            display: none;
+        }
+    }
+</style>

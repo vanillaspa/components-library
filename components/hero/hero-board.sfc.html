@@ -1,0 +1,132 @@
+<template>
+    <div class="board-wrap">
+        <div id="board-canvas" class="board"></div>
+        <p class="hint">Click an adjacent tile · Arrow keys also work</p>
+    </div>
+</template>
+
+<script>
+    const { addEventListener: busListen, dispatchEvent: busDispatch } = window.eventbus;
+    const { commands, notifications, ROWS, COLS, TILE } = window.HeroContract;
+    const host   = shadowDocument.host;
+    const canvas = shadowDocument.getElementById('board-canvas');
+
+    const GLYPH = {
+        [TILE.FLOOR]:   '·',
+        [TILE.WALL]:    '█',
+        [TILE.MONSTER]: '👹',
+        [TILE.CHEST]:   '🎁',
+        [TILE.POTION]:  '🧪',
+        [TILE.EXIT]:    '🚪',
+    };
+
+    function render({ grid, player, hero, combat }) {
+        if (hero.hp <= 0) {
+            canvas.innerHTML = '<div class="game-over">💀 Game Over 💀<br><small>Press New Game to restart</small></div>';
+            return;
+        }
+        canvas.innerHTML = '';
+        for (let r = 0; r < ROWS; r++) {
+            const row = document.createElement('div');
+            row.className = 'row';
+            for (let c = 0; c < COLS; c++) {
+                const isPlayer = r === player.row && c === player.col;
+                const type     = isPlayer ? 'player' : grid[r][c].type;
+                const cell     = document.createElement('button');
+                cell.type      = 'button';
+                cell.className = `cell ${type}`;
+                cell.textContent = isPlayer ? '🧙' : (GLYPH[type] ?? '·');
+                cell.setAttribute('aria-label', type);
+
+                if (!isPlayer) {
+                    const dr = r - player.row, dc = c - player.col;
+                    const adjacent = Math.abs(dr) + Math.abs(dc) === 1;
+                    if (adjacent && type !== TILE.WALL && !combat) {
+                        cell.classList.add('movable');
+                        cell.addEventListener('click', () => {
+                            busDispatch(new CustomEvent(commands.MOVE, { detail: { dr, dc } }));
+                        });
+                    }
+                }
+                row.appendChild(cell);
+            }
+            canvas.appendChild(row);
+        }
+    }
+
+    busListen(notifications.STATE, (e) => render(e.detail), host);
+</script>
+
+<style>
+    :host { display: block; }
+
+    .board-wrap {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .hint { font-size: 0.72rem; color: #666; margin: 0; }
+
+    .board {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        background: #0d0d1a;
+        padding: 6px;
+        border-radius: 6px;
+        border: 2px solid #334;
+    }
+
+    .row { display: flex; gap: 2px; }
+
+    .cell {
+        width: 36px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+        border: none;
+        border-radius: 4px;
+        cursor: default;
+        background: #1a1a2e;
+        color: #ccc;
+        padding: 0;
+        line-height: 1;
+        outline: none;
+        user-select: none;
+    }
+
+    .cell.wall    { background: #0a0a14; color: #333; }
+    .cell.floor   { color: #2a2a3e; }
+    .cell.player  { background: #16213e; font-size: 1.25rem; }
+    .cell.monster { background: #2a1010; }
+    .cell.chest   { background: #2a2610; }
+    .cell.potion  { background: #102a1a; }
+    .cell.exit    { background: #10102a; }
+
+    .cell.movable {
+        cursor: pointer;
+        box-shadow: 0 0 0 2px #4caf5066;
+        transition: box-shadow 0.1s, background 0.1s;
+    }
+    .cell.movable:hover {
+        background: #1e3a2e;
+        box-shadow: 0 0 0 2px #4caf50;
+    }
+
+    .game-over {
+        text-align: center;
+        color: #e94560;
+        font-size: 1.4rem;
+        font-weight: bold;
+        padding: 2rem;
+        line-height: 2.2;
+    }
+
+    @media (max-width: 480px) {
+        .cell { width: 28px; height: 28px; font-size: 0.85rem; }
+    }
+</style>

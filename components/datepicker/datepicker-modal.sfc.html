@@ -1,0 +1,520 @@
+<template>
+    <div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-label="Datumswahl">
+        <div class="modal-card">
+            <button class="close-btn" id="closeBtn" title="Schließen">✕</button>
+            <div class="cal-nav">
+                <button id="prevMonth">&#8592;</button>
+                <span class="cal-month" id="calMonth"></span>
+                <button id="nextMonth">&#8594;</button>
+            </div>
+            <div class="cal-grid" id="calGrid"></div>
+            <hr />
+            <p class="modal-input-label">Manuell eingeben</p>
+            <div class="input-wrap">
+                <input class="field" id="manualInput" type="text" placeholder="TT.MM.JJJJ" maxlength="10"
+                    autocomplete="off" spellcheck="false" />
+                <span class="input-icon hidden" id="manualIcon"></span>
+            </div>
+            <p class="feedback empty" id="feedback"></p>
+        </div>
+    </div>
+</template>
+
+
+<script>
+    const DATE_REGEX = /^(((0?[1-9]|1[0-9]|2[0-8])\.(0?[1-9]|1[0-2])|(29|30)\.(0?[1,3-9]|1[0-2])|31\.(0?[13578]|1[02]))\.(19|20)?[0-9]{2}|29\.0?2\.(19|20)?(0[048]|[2468][048]|[13579][26]))$/;
+    const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+    const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+
+
+    const today = new Date();
+    let viewYear = today.getFullYear();
+    let viewMonth = today.getMonth();
+    let selectedDate = null;
+
+
+    const calGrid = shadowDocument.getElementById('calGrid');
+    const calMonth = shadowDocument.getElementById('calMonth');
+    const manualInput = shadowDocument.getElementById('manualInput');
+    const manualIcon = shadowDocument.getElementById('manualIcon');
+    const feedback = shadowDocument.getElementById('feedback');
+    const overlay = shadowDocument.getElementById('overlay');
+
+
+    // ── Open / close ─────────────────────────────────────────
+    function openModal(currentValue) {
+        overlay.classList.add('open');
+        manualInput.value = currentValue || '';
+        syncModalState(manualInput.value);
+        setTimeout(() => manualInput.focus(), 80);
+    }
+
+
+    function closeModal() {
+        overlay.classList.remove('open');
+    }
+
+
+    shadowDocument.getElementById('closeBtn').addEventListener('click', closeModal);
+    overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && overlay.classList.contains('open')) closeModal(); });
+
+
+    // ── Listen for open dispatched directly on this element ───────
+    shadowDocument.host.addEventListener('datepicker:open', e => {
+        openModal(e.detail.value);
+    });
+
+
+    // ── Calendar ─────────────────────────────────────────────
+    function renderCalendar() {
+        calMonth.textContent = `${MONTHS[viewMonth]} ${String(viewYear).padStart(4, '0')}`;
+        calGrid.innerHTML = '';
+
+
+        DAYS.forEach(d => {
+            const cell = document.createElement('div');
+            cell.className = 'cal-dow';
+            cell.textContent = d;
+            calGrid.appendChild(cell);
+        });
+
+
+        const offset = (new Date(viewYear, viewMonth, 1).getDay() + 6) % 7;
+        const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+        const daysInPrev = new Date(viewYear, viewMonth, 0).getDate();
+
+
+        for (let i = offset - 1; i >= 0; i--) calGrid.appendChild(makeDay(daysInPrev - i, viewMonth - 1, viewYear, true));
+        for (let d = 1; d <= daysInMonth; d++) calGrid.appendChild(makeDay(d, viewMonth, viewYear, false));
+        for (let d = 1; d <= 42 - (offset + daysInMonth); d++) calGrid.appendChild(makeDay(d, viewMonth + 1, viewYear, true));
+    }
+
+
+    function makeDay(day, month, year, otherMonth) {
+        const date = new Date(year, month, day);
+        const cell = document.createElement('div');
+        cell.className = [
+            'cal-day',
+            otherMonth ? 'other-month' : '',
+            date.toDateString() === today.toDateString() ? 'today' : '',
+            selectedDate && date.toDateString() === selectedDate.toDateString() ? 'selected' : ''
+        ].join(' ').trim();
+        cell.textContent = day;
+
+
+        cell.addEventListener('click', () => {
+            selectedDate = date;
+            viewYear = date.getFullYear();
+            viewMonth = date.getMonth();
+            const formatted = formatDate(date);
+            manualInput.value = formatted;
+            renderCalendar();
+            syncModalState(formatted);
+            emitSelect(formatted);
+            setTimeout(closeModal, 180);
+        });
+        return cell;
+    }
+
+
+    shadowDocument.getElementById('prevMonth').addEventListener('click', () => { if (--viewMonth < 0) { viewMonth = 11; viewYear--; } renderCalendar(); });
+    shadowDocument.getElementById('nextMonth').addEventListener('click', () => { if (++viewMonth > 11) { viewMonth = 0; viewYear++; } renderCalendar(); });
+
+
+    // ── Manual input ─────────────────────────────────────────
+    manualInput.addEventListener('input', e => {
+        const input = e.target, raw = input.value;
+        const isInserting = !e.inputType || e.inputType.startsWith('insert');
+
+
+        let v = raw.replace(/[^0-9.]/g, '').replace(/\.{2,}/g, '.');
+        const parts = v.split('.');
+        if (parts.length > 3) v = parts[0] + '.' + parts[1] + '.' + parts.slice(2).join('');
+        const [d, m, y] = v.split('.');
+        v = [d?.slice(0, 2), m?.slice(0, 2), y?.slice(0, 4)].filter(s => s !== undefined).join('.');
+
+
+        if (isInserting) {
+            const dotCount = (v.match(/\./g) || []).length;
+            if (dotCount === 0 && v.length === 2) v += '.';
+            if (dotCount === 1 && v.length === 5 && !v.endsWith('.')) v += '.';
+        }
+
+
+        if (input.value !== v) {
+            const cursor = input.selectionStart + (v.length - raw.length);
+            input.value = v;
+            input.setSelectionRange(cursor, cursor);
+        }
+
+
+        syncModalState(v);
+        if (DATE_REGEX.test(v)) emitSelect(v);
+        else if (v.length === 0) emitSelect('');
+    });
+
+
+    // ── Event bus emit ────────────────────────────────────────
+    function emitSelect(value) {
+        shadowDocument.host.dispatchEvent(new CustomEvent('datepicker:select', {
+            detail: { value }
+        }));
+    }
+
+
+    // ── State helpers ────────────────────────────────────────
+    function syncModalState(v) {
+        const valid = DATE_REGEX.test(v);
+        manualInput.classList.toggle('valid', valid);
+        manualInput.classList.toggle('invalid', !valid && v.length >= 8);
+        if (valid) {
+            setIcon(manualIcon, '✓', 'var(--green)');
+            feedback.textContent = 'Gültiges Datum';
+            feedback.className = 'feedback valid';
+            const [d, m, y] = v.split('.');
+            selectedDate = new Date(+y, +m - 1, +d);
+            viewYear = selectedDate.getFullYear();
+            viewMonth = selectedDate.getMonth();
+            renderCalendar();
+        } else if (v.length >= 8) {
+            setIcon(manualIcon, '✕', 'var(--red)');
+            feedback.textContent = 'Ungültiges Datum';
+            feedback.className = 'feedback invalid';
+        } else {
+            manualIcon.classList.add('hidden');
+            feedback.textContent = '';
+            feedback.className = 'feedback empty';
+        }
+    }
+
+
+    function setIcon(el, char, color) { el.textContent = char; el.style.color = color; el.classList.remove('hidden'); }
+
+
+    const pad2 = n => String(n).padStart(2, '0');
+    const formatDate = d => `${pad2(d.getDate())}.${pad2(d.getMonth() + 1)}.${d.getFullYear()}`;
+
+
+    renderCalendar();
+</script>
+
+
+<style>
+    *,
+    *::before,
+    *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+    }
+
+
+    :host {
+        --border: rgba(180, 150, 30, .55);
+        --border-bright: rgba(212, 175, 55, .75);
+        --accent: #d4af37;
+        --accent-light: #f0d060;
+        --accent-dim: #c8a030;
+        --text: #f5e9b0;
+        --text-muted: #cce89a;
+        --text-faint: #7aaa50;
+        --red: #f07878;
+        --green: #96f092;
+        --radius: 5px;
+        display: contents;
+    }
+
+
+    /* ── Shared field style ── */
+    .field {
+        width: 100%;
+        background: rgba(0, 30, 0, .75);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        color: var(--text);
+        font-family: 'DM Mono', monospace;
+        font-size: 1rem;
+        padding: .65rem 2.8rem .65rem 1rem;
+        outline: none;
+        letter-spacing: .06em;
+        transition: border-color .15s, box-shadow .15s;
+    }
+
+
+    .field:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px rgba(212, 175, 55, .15), inset 0 0 12px rgba(212, 175, 55, .04);
+    }
+
+
+    .field.valid {
+        border-color: var(--green);
+        box-shadow: 0 0 0 2px rgba(125, 216, 122, .12);
+    }
+
+
+    .field.invalid {
+        border-color: var(--red);
+        box-shadow: 0 0 0 2px rgba(224, 96, 96, .12);
+    }
+
+
+    .field::placeholder {
+        color: var(--text-faint);
+        font-size: .9rem;
+    }
+
+
+    .input-wrap {
+        position: relative;
+    }
+
+
+    .input-icon {
+        position: absolute;
+        right: .8rem;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: .85rem;
+        pointer-events: none;
+        transition: opacity .2s;
+    }
+
+
+    .input-icon.hidden {
+        opacity: 0;
+    }
+
+
+    /* ── Modal overlay ── */
+    .overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
+        background: rgba(0, 0, 0, .55);
+        backdrop-filter: blur(3px);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity .2s;
+        font-family: 'DM Mono', monospace;
+        color: var(--text);
+    }
+
+
+    .overlay.open {
+        opacity: 1;
+        pointer-events: all;
+    }
+
+
+    /* ── Modal card ── */
+    .modal-card {
+        position: relative;
+        width: 100%;
+        max-width: 340px;
+        padding: 2.4rem 2.4rem 1.6rem;
+        border: 1px solid var(--border-bright);
+        border-radius: var(--radius);
+        background: linear-gradient(145deg, rgba(30, 90, 0, .98) 0%, rgba(18, 60, 0, 1) 55%, rgba(10, 38, 0, .99) 100%);
+        box-shadow:
+            0 2px 0 rgba(212, 175, 55, .22), 0 24px 80px rgba(0, 0, 0, .85),
+            0 0 0 1px rgba(212, 175, 55, .07),
+            inset 0 1px 0 rgba(212, 175, 55, .18), inset 0 -1px 0 rgba(0, 0, 0, .4);
+        opacity: 0;
+        transform: translateY(12px) scale(.97);
+        transition: transform .22s, opacity .22s;
+    }
+
+
+    .overlay.open .modal-card {
+        opacity: 1;
+        transform: none;
+    }
+
+
+    .modal-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 12%;
+        right: 12%;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, var(--accent-light), transparent);
+    }
+
+
+    .close-btn {
+        position: absolute;
+        top: .7rem;
+        right: .7rem;
+        background: none;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        color: var(--text-faint);
+        width: 26px;
+        height: 26px;
+        cursor: pointer;
+        font-size: .8rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: border-color .15s, color .15s;
+    }
+
+
+    .close-btn:hover {
+        border-color: var(--accent-dim);
+        color: var(--accent);
+    }
+
+
+    /* ── Calendar ── */
+    .cal-nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 1.2rem;
+    }
+
+
+    .cal-nav button {
+        background: rgba(212, 175, 55, .06);
+        border: 1px solid var(--border);
+        color: var(--text-muted);
+        width: 32px;
+        height: 32px;
+        border-radius: var(--radius);
+        cursor: pointer;
+        font-size: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: border-color .15s, color .15s, background .15s;
+    }
+
+
+    .cal-nav button:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+        background: rgba(212, 175, 55, .14);
+    }
+
+
+    .cal-month {
+        font-family: 'Playfair Display', serif;
+        font-size: 1rem;
+        font-weight: 600;
+        letter-spacing: .04em;
+        color: var(--accent-light);
+    }
+
+
+    .cal-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 2px;
+    }
+
+
+    .cal-dow {
+        text-align: center;
+        font-size: .68rem;
+        letter-spacing: .1em;
+        color: var(--text-faint);
+        padding: .3rem 0 .6rem;
+    }
+
+
+    .cal-day {
+        aspect-ratio: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: .8rem;
+        border-radius: var(--radius);
+        cursor: pointer;
+        color: var(--text-muted);
+        border: 1px solid transparent;
+        user-select: none;
+        transition: background .1s, color .1s, border-color .1s;
+    }
+
+
+    .cal-day:hover {
+        background: rgba(212, 175, 55, .1);
+        color: var(--text);
+        border-color: rgba(212, 175, 55, .3);
+    }
+
+
+    .cal-day.today {
+        color: var(--accent-light);
+        border-color: var(--accent-dim);
+        background: rgba(212, 175, 55, .08);
+    }
+
+
+    .cal-day.selected {
+        background: linear-gradient(135deg, var(--accent-light) 0%, var(--accent) 100%);
+        color: #0c2e00;
+        font-weight: 600;
+        border-color: var(--accent-light);
+        box-shadow: 0 2px 8px rgba(212, 175, 55, .4);
+    }
+
+
+    .cal-day.other-month {
+        color: var(--text-faint);
+    }
+
+
+    .cal-day.other-month:hover {
+        color: var(--text-muted);
+    }
+
+
+    hr {
+        border: none;
+        border-top: 1px solid;
+        border-image: linear-gradient(90deg, transparent, var(--border-bright), transparent) 1;
+        margin: 1.4rem 0;
+    }
+
+
+    .modal-input-label {
+        font-size: .72rem;
+        letter-spacing: .15em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        margin-bottom: .5rem;
+    }
+
+
+    .feedback {
+        margin-top: .5rem;
+        font-size: .75rem;
+        letter-spacing: .06em;
+        height: 1rem;
+        transition: opacity .2s;
+    }
+
+
+    .feedback.valid {
+        color: var(--green);
+    }
+
+
+    .feedback.invalid {
+        color: var(--red);
+    }
+
+
+    .feedback.empty {
+        opacity: 0;
+    }
+</style>

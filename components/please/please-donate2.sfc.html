@@ -1,0 +1,55 @@
+<template>
+    <h1>VanillaSPA: Future-Proof Stack</h1>
+
+    <section>
+        <h3>1. Database (SQLite Worker)</h3>
+        <p>This runs in a separate thread. No UI lag, no Access lock-in.</p>
+        <sqlite-control></sqlite-control>
+        <pre id="output">Waiting for action...</pre>
+    </section>
+
+    <section>
+        <h3>2. Support the Evolution</h3>
+        <p>No heavy frameworks. Just clean code.</p>
+        <button id="donate-paypal">
+            Donate via PayPal
+        </button>
+    </section>
+</template>
+
+<script>
+    const button = shadowDocument.querySelector("#donate-paypal");
+    button.addEventListener("click", () => {
+        sendDonation('robert.meissner@outlook.com', 'EUR');
+    })
+    window.sendDonation = (email, currency) => {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = 'https://www.paypal.com/cgi-bin/webscr';
+            const params = { cmd: '_donations', business: email, currency_code: currency, item_name: 'VanillaSPA Support' };
+            for (const [key, value] of Object.entries(params)) {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = key;
+                input.value = value;
+                form.appendChild(input);
+            }
+            document.body.appendChild(form);
+            form.submit();
+        };
+</script>
+
+<style>
+    button {
+        background: #0070ba;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: bold;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+</style>

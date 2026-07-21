@@ -1,0 +1,303 @@
+<template>
+    <router-hamburger></router-hamburger>
+    <nav>
+        <ul>
+            <li><a href="/sqlite">SQLite</a></li>
+            <li><a href="/opfs">OPFS</a></li>
+            <li><a href="/dragndrop">Drag'n Drop Demo</a></li>
+            <li><a href="/test">Test</a></li>
+            <li><a href="/hero">Hero Quest</a></li>
+        </ul>
+    </nav>
+    <main></main>
+</template>
+
+<script>
+    (function patchPushStateIIFE(history) { // to fire pushstate-Event on pushState
+        const pushStateOriginal = history.pushState;
+        history.pushState = function patchedPushState(state, unused, url) {
+            pushStateOriginal.call(history, state, unused, url);
+            dispatchEvent(new Event('pushstate'));
+        };
+    })(window.history);
+
+    let _sitemap = [[
+        { "/": { "title": "Home", "template": "home-page" } }
+    ],
+    [
+        { "/sqlite": { "title": "SQLite", "template": "sqlite-workers" } },
+        { "/opfs": { "title": "OPFS", "template": "opfs-admin" } },
+        { "/dragndrop": { "title": "Drag'nDrop", "template": "dragndrop-container" } },
+        { "/test": { "title": "Test", "template": "test-page" } },
+        { "/hero": { "title": "Hero Quest", "template": "hero-quest" } }
+    ]];
+
+    function getMapping(pathname) {
+        let errorMapping = { "title": "404", "template": "error-404" };  // default
+        let mapping = errorMapping;
+        let resources = pathname.split("/");
+        if (resources[1]) { // find URL in sitemap
+            for (let route of _sitemap[resources.length - 1]) {
+                if (route[pathname]) { mapping = route[pathname]; } // found
+            }
+        } else { mapping = _sitemap[0][0][pathname] } // single /
+        if (!customElements.get(mapping.template)) { return errorMapping; }
+        return mapping;
+    }
+
+    const main = shadowDocument.querySelector("main");
+    function loadContent(e) {
+        let mapping = getMapping(location.pathname);
+        main.replaceChildren(document.createElement(mapping.template));
+    }
+
+    function activate(e) {
+        shadowDocument.querySelector(".active")?.classList.remove("active");
+        for (let a of shadowDocument.querySelectorAll('a')) {
+            if (location.pathname.includes(a.getAttribute("href"))) {
+                a.closest("li").classList.add("active");
+                break;
+            }
+        }
+    }
+
+    loadContent();
+    addEventListener("popstate", loadContent);
+    addEventListener("pushstate", loadContent);
+
+    activate();
+    addEventListener("popstate", activate);
+    addEventListener("pushstate", activate);
+
+    const hamburger = shadowDocument.querySelector("router-hamburger");
+    const nav = shadowDocument.querySelector("nav");
+    hamburger.addEventListener("click", function onHamburgerClicked(e) {
+        e.preventDefault();
+        hamburger.classList.toggle("open");
+        nav.classList.toggle("open");
+    });
+
+    function onLinkClick(e) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        let li = e.target.closest("li");
+        let a = li.querySelector("a");
+        let pathname = a.getAttribute("href");
+        let mapping = getMapping(pathname);
+        history.pushState(mapping.template, mapping.title, pathname);
+    }
+
+    const links = shadowDocument.querySelectorAll("li");
+    links.forEach(li => {
+        li.addEventListener("click", onLinkClick);
+        let a = li.querySelector("a");
+        a.addEventListener("click", onLinkClick); // UX, for closest("li") in onLinkClick
+    });
+
+    // workaround to access at least the first routing level when url entered into browser's address bar 
+    const resources = (location.pathname).split("/");
+    if (resources.length > 2) { push(resources.slice(0, 2).join("/")); }
+</script>
+
+<style>
+    nav {
+        &.open {
+            transform: translateY(0);
+        }
+
+        display: flex;
+        transform: translateY(calc(-100% - 30px));
+        transition: transform 1s ease-in-out;
+        width: 100%;
+        z-index: 1;
+
+        position: sticky;
+        top: 0;
+
+        ul {
+            display: flex;
+            flex-flow: column nowrap;
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            width: inherit;
+
+            li {
+                background-color: transparent;
+                border-top: 15px solid transparent;
+                border-right: 50vw solid #144000;
+                border-bottom: 0px solid #144000;
+                border-left: 50vw solid #144000;
+                cursor: pointer;
+                display: flex;
+                flex-flow: row nowrap;
+                justify-content: center;
+                height: 50px;
+                position: relative;
+                z-index: 0;
+
+                &::after {
+                    position: absolute;
+                    border-top: 15px solid #144000;
+                    border-left: 50vw solid transparent;
+                    border-right: 50vw solid transparent;
+                    border-bottom: 0 solid transparent;
+                    content: "";
+                    display: block;
+                    top: 50px;
+                }
+
+
+                &:hover {
+                    border-left: 50vw solid #ffff00;
+                    border-right: 50vw solid #ffff00;
+                    border-bottom: 0px solid #ffff00;
+                    position: relative;
+                    z-index: 1;
+
+                    &::after {
+                        border-top: 15px solid #ffff00;
+                        z-index: 1;
+                    }
+
+                    a {
+                        opacity: 1 !important;
+                        color: #144000;
+                    }
+                }
+
+                a {
+                    color: #ffd700;
+                    text-decoration: none;
+                    font-weight: bold;
+                    align-self: center;
+                    line-height: 30px;
+                    font-size: 30px;
+                    white-space: nowrap;
+
+                    &:hover {
+                        text-shadow: 0px 0px 8px #144000;
+                        transition: text-shadow .2s ease-in .05s;
+                    }
+                }
+
+                &.active {
+                    border-top: 15px solid transparent;
+                    border-left: 50vw solid #ffd700;
+                    border-right: 50vw solid #ffd700;
+                    border-bottom: 0px solid #ffd700;
+                    position: relative;
+                    z-index: 1;
+
+                    &::after {
+                        border-top: 15px solid #ffd700;
+                    }
+
+                    &:hover {
+                        border-top: 15px solid transparent;
+                        border-left: 50vw solid #ffff00;
+                        border-right: 50vw solid #ffff00;
+                        border-bottom: 0px solid #ffff00;
+
+                        &::after {
+                            border-top: 15px solid #ffff00;
+                        }
+                    }
+
+                    a {
+                        color: #144000;
+                    }
+                }
+            }
+        }
+    }
+
+    @media only screen and (min-width: 600px) {
+        nav {
+            overflow: hidden;
+
+            ul {
+                flex-flow: row nowrap;
+                width: calc(100% - 30px);
+
+                li {
+                    width: 33vw;
+                    border-top: 4vh solid #144000;
+                    border-right: 30px solid #144000;
+                    border-bottom: 4vh solid #144000;
+                    border-left: 30px solid transparent;
+                    height: 0;
+
+                    &:last-child::after {
+                        border-top: 4vh solid transparent;
+                        border-bottom: 4vh solid transparent;
+                        border-right: 0;
+                        top: 0;
+                    }
+
+                    &:last-child:hover {
+                        &&::after {
+                            border-right: 0;
+                        }
+                    }
+
+                    &::after {
+                        transform: translate(100%, -50%);
+                        border-top: 4vh solid transparent;
+                        border-right: 30px solid transparent;
+                        border-bottom: 4vh solid transparent;
+                        border-left: 30px solid #144000;
+                        height: 0;
+                        right: -28px;
+                        top: 0;
+                    }
+
+                    &:hover {
+                        border-top: 4vh solid #ffff00;
+                        border-right: 30px solid #ffff00;
+                        border-bottom: 4vh solid #ffff00;
+                        border-left: 30px solid transparent;
+
+                        &::after {
+                            border-top: 4vh solid transparent;
+                            border-right: 30px solid transparent;
+                            border-bottom: 4vh solid transparent;
+                            border-left: 30px solid #ffff00;
+                            top: 0;
+                        }
+                    }
+
+                    &.active {
+                        border-top: 4vh solid #ffd700;
+                        border-right: 30px solid #ffd700;
+                        border-bottom: 4vh solid #ffd700;
+                        border-left: 30px solid transparent;
+
+                        &::after {
+                            border-left: 30px solid #ffd700;
+                            border-top: 4vh solid transparent;
+                        }
+
+                        &:hover {
+                            border-top: 4vh solid #ffff00;
+                            border-right: 30px solid #ffff00;
+                            border-bottom: 4vh solid #ffff00;
+                            border-left: 30px solid transparent;
+
+                            &::after {
+                                border-left: 30px solid #ffff00;
+                                border-top: 4vh solid transparent;
+                            }
+                        }
+                    }
+
+                    a {
+                        top: 0;
+                        align-self: center;
+                        position: relative;
+                    }
+                }
+            }
+        }
+    }
+</style>

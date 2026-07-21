@@ -1,0 +1,73 @@
+<template>
+    <div class="wrap">
+        <h3 class="title">🎒 Inventory</h3>
+        <div id="i-gold" class="gold"></div>
+        <p id="i-empty" class="idle">Empty — find chests!</p>
+        <ul id="i-list" class="list hidden"></ul>
+    </div>
+</template>
+
+<script>
+    const { addEventListener: busListen } = window.eventbus;
+    const { notifications } = window.HeroContract;
+    const host    = shadowDocument.host;
+    const goldEl  = shadowDocument.getElementById('i-gold');
+    const listEl  = shadowDocument.getElementById('i-list');
+    const emptyEl = shadowDocument.getElementById('i-empty');
+
+    busListen(notifications.STATE, (e) => {
+        const { hero } = e.detail;
+        goldEl.textContent = `🪙 ${hero.gold} gold`;
+
+        if (!hero.inventory.length) {
+            listEl.classList.add('hidden');
+            emptyEl.classList.remove('hidden');
+            return;
+        }
+        emptyEl.classList.add('hidden');
+        listEl.classList.remove('hidden');
+        listEl.innerHTML = '';
+        hero.inventory.forEach((item) => {
+            const li = document.createElement('li');
+            li.className  = 'item';
+            li.textContent = item;
+            listEl.appendChild(li);
+        });
+    }, host);
+</script>
+
+<style>
+    :host { display: block; }
+
+    .title {
+        color: #ffd700;
+        margin: 0 0 0.4rem;
+        font-size: 0.95rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .gold  { font-size: 0.85rem; color: #ffd700; margin-bottom: 0.4rem; }
+    .idle  { font-size: 0.8rem; color: #555; margin: 0; }
+
+    .list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+        max-height: 150px;
+        overflow-y: auto;
+    }
+    .list.hidden { display: none; }
+
+    .item {
+        background: #0d0d1a;
+        border: 1px solid #334;
+        border-radius: 0.3rem;
+        padding: 0.25rem 0.5rem;
+        font-size: 0.8rem;
+        color: #e0e0e0;
+    }
+</style>

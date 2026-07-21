@@ -1,0 +1,60 @@
+<template>
+    <article id="parent"></article>
+</template>
+
+<style>
+    article {
+        display: flex;
+        flex-flow: column nowrap;
+        gap: 20px;
+    }
+
+    @media only screen and (min-width: 600px) {
+        article {
+            flex-flow: row wrap;
+        }
+    }
+</style>
+
+<script>
+    const { mountBridge, useContract } = window.eventbus;
+    const host = shadowDocument.host;
+
+    mountBridge(window.SqliteContract, host);
+    const db = useContract(window.SqliteContract, host);
+
+    await db.create({ name: 'notes' });
+    await db.query({
+        sql: `
+CREATE TABLE IF NOT EXISTS notes(id INTEGER PRIMARY KEY, title VARCHAR(255), note TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT current_timestamp, updated_at TEXT NOT NULL DEFAULT current_timestamp);
+INSERT OR REPLACE INTO notes(id, title, note) VALUES
+(1, 'Most Popular Database', 'SQLite is the "<a href="https://www.sqlite.org/mostdeployed.html">Most Widely Deployed and Used Database Engine.</a>" I am using it for persistent state management in an <a href="https://developer.mozilla.org/en-US/docs/Web/API/File_System_API/Origin_private_file_system">Origin Private File System (OPFS)</a>. I recommend using Chromium/Chrome with <a href="https://github.com/tomayac/opfs-explorer">OPFS explorer</a>.'),
+(2, 'Symbolic programming', 'In an <a href="https://www.youtube.com/watch?v=PdE-waSx-d8">interview with Stephen Wolfram</a> I have found a particularly noteworthy quote that "even very simple programs can do all sorts of complicated things". This is something I have been working on as a computer scientist and hobby psychologist for years now. It is one aspect of declarative and the foundation of symbolic programming. It is a model for <a href="https://www.youtube.com/watch?v=Ohk5TvaW6vs">how nature works</a> and how you could use a no-code platform.'),
+(3, 'Project Management', '<a href="https://www.youtube.com/watch?v=GC7pN8Mjot8">Ricardo Vargas explains PMBOK Guide 6th edition</a> in less than one hour. The solution I am working on helps manage the Planning, the Executing and the Monitoring & Controlling phases of an event-based project.'),
+(4, 'Migration to @vanillaspa', 'While still using <a href="https://vuejs.org/guide/typescript/overview.html">Vue.js and TypeScript</a> at work, I have now migrated this Website to my self-written vanilla JavaScript WebComponents framework <a href="https://vanillaspa.github.io/github-page/">Vanilla SPA</a>. The migration worked fine and serves as a proof of concept, that the framework can be used in a production environment (while it is still "work in progress").'),
+(5, 'Tame Your advice monster', 'I know, this website is <i>beta</i>, I know it is using technology, one could argue about. I know, one could do things better and while I am always open for constructive feedback, <a href="https://www.ted.com/talks/michael_bungay_stanier_how_to_tame_your_advice_monster">You have to learn to tame your advice monster</a>. I am not trying to safe the world.'),
+(6, 'Contribution', 'P2P QUIC/gRPC protobuf WASM SQLite OPFS API IndexedDB fallback/Postgres sounds familiar to you? Lets connect :)');`, name: 'notes'
+    });
+    const { result } = await db.query({ sql: `SELECT * FROM notes ORDER BY id DESC;`, name: 'notes' });
+
+    function getNotes(id) {
+        if (!id) return;
+        return db.statement({ sql: `SELECT * FROM notes WHERE id=$1;`, values: [id], name: 'notes' });
+    }
+
+    function insertNote({ title, note }) {
+        return db.statement({ sql: `INSERT INTO notes(title, note) VALUES ($1,$2) RETURNING id;`, values: [title, note], name: 'notes' });
+    }
+
+    function deleteNote(id) {
+        return db.statement({ sql: `DELETE FROM notes WHERE id=$1;`, values: [id], name: 'notes' });
+    }
+
+    const parentArticle = shadowDocument.querySelector('#parent');
+    parentArticle.replaceChildren();
+    result.forEach(([id, title, note, created_at, updated_at]) => {
+        const article = document.createElement('notes-article');
+        article.dataset.state = JSON.stringify({ id, title, note, created_at, updated_at });
+        parentArticle.appendChild(article);
+    });
+</script>

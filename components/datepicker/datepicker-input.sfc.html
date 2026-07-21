@@ -1,0 +1,254 @@
+<template>
+    <div class="datepicker-wrap">
+        <p class="input-label">Datum</p>
+        <div class="input-wrap">
+            <input class="field" id="triggerInput" type="text" placeholder="TT.MM.JJJJ" maxlength="10"
+                autocomplete="off" spellcheck="false" />
+            <span class="input-icon hidden" id="triggerIcon"></span>
+        </div>
+    </div>
+    <datepicker-modal></datepicker-modal>
+</template>
+
+<script>
+    const triggerInput = shadowDocument.getElementById('triggerInput');
+    const triggerIcon = shadowDocument.getElementById('triggerIcon');
+
+
+    const DATE_REGEX = /^(((0?[1-9]|1[0-9]|2[0-8])\.(0?[1-9]|1[0-2])|(29|30)\.(0?[1,3-9]|1[0-2])|31\.(0?[13578]|1[02]))\.(19|20)?[0-9]{2}|29\.0?2\.(19|20)?(0[048]|[2468][048]|[13579][26]))$/;
+
+
+    // ── Detect modal presence and configure mode ─────────────
+    // Check both the shadow DOM (modal embedded in template) and the light DOM
+    const modalEl = shadowDocument.querySelector('datepicker-modal') || document.querySelector('datepicker-modal');
+
+
+    if (modalEl) {
+        // ── Modal mode: readonly, dispatches directly on the modal element ─
+        triggerInput.readOnly = true;
+        triggerInput.style.cursor = 'pointer';
+        triggerInput.style.caretColor = 'transparent';
+
+
+        function requestOpen() {
+            modalEl.dispatchEvent(new CustomEvent('datepicker:open', {
+                detail: { value: triggerInput.value }
+            }));
+        }
+
+
+        triggerInput.addEventListener('click', requestOpen);
+        triggerInput.addEventListener('keydown', e => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); requestOpen(); }
+        });
+
+
+        // Listen for select dispatched back directly on the modal element
+        modalEl.addEventListener('datepicker:select', e => {
+            const v = e.detail.value;
+            triggerInput.value = v;
+            updateTrigger(v);
+        });
+    } else {
+        // ── Standalone mode: editable with inline formatting ──
+        triggerInput.addEventListener('input', e => {
+            const input = e.target, raw = input.value;
+            const isInserting = !e.inputType || e.inputType.startsWith('insert');
+
+
+            let v = raw.replace(/[^0-9.]/g, '').replace(/\.{2,}/g, '.');
+            const parts = v.split('.');
+            if (parts.length > 3) v = parts[0] + '.' + parts[1] + '.' + parts.slice(2).join('');
+            const [d, m, y] = v.split('.');
+            v = [d?.slice(0, 2), m?.slice(0, 2), y?.slice(0, 4)].filter(s => s !== undefined).join('.');
+
+
+            if (isInserting) {
+                const dotCount = (v.match(/\./g) || []).length;
+                if (dotCount === 0 && v.length === 2) v += '.';
+                if (dotCount === 1 && v.length === 5 && !v.endsWith('.')) v += '.';
+            }
+
+
+            if (input.value !== v) {
+                const cursor = input.selectionStart + (v.length - raw.length);
+                input.value = v;
+                input.setSelectionRange(cursor, cursor);
+            }
+
+
+            updateTrigger(v);
+        });
+    }
+
+
+    // ── Trigger state ────────────────────────────────────────
+    function updateTrigger(v) {
+        const valid = DATE_REGEX.test(v);
+        triggerInput.classList.toggle('valid', valid);
+        triggerInput.classList.toggle('invalid', !valid && v.length >= 8);
+        if (valid) {
+            setIcon(triggerIcon, '✓', 'var(--green)');
+        } else if (v.length === 0) {
+            triggerIcon.classList.add('hidden');
+            triggerInput.classList.remove('valid', 'invalid');
+        }
+    }
+
+
+    function setIcon(el, char, color) { el.textContent = char; el.style.color = color; el.classList.remove('hidden'); }
+</script>
+
+
+<style>
+    *,
+    *::before,
+    *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+    }
+
+
+    :host {
+        --border: rgba(180, 150, 30, .55);
+        --border-bright: rgba(212, 175, 55, .75);
+        --accent: #d4af37;
+        --accent-light: #f0d060;
+        --accent-dim: #c8a030;
+        --text: #f5e9b0;
+        --text-muted: #cce89a;
+        --text-faint: #7aaa50;
+        --red: #f07878;
+        --green: #96f092;
+        --radius: 5px;
+    }
+
+
+    :host {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        font-family: 'DM Mono', monospace;
+        color: var(--text);
+        background:
+            radial-gradient(ellipse at 20% 10%, #1e6b00 0%, transparent 55%),
+            radial-gradient(ellipse at 80% 90%, #0d3d00 0%, transparent 55%),
+            radial-gradient(ellipse at 60% 40%, #186000 0%, transparent 50%),
+            linear-gradient(160deg, #0e3800 0%, #144000 40%, #0a2800 100%);
+    }
+
+
+    :host::before,
+    :host::after {
+        content: '';
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 0;
+    }
+
+
+    :host::before {
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
+    }
+
+
+    :host::after {
+        background:
+            radial-gradient(ellipse 60% 40% at 50% 0%, rgba(212, 175, 55, .07) 0%, transparent 70%),
+            radial-gradient(ellipse 40% 30% at 100% 100%, rgba(100, 220, 80, .05) 0%, transparent 60%);
+    }
+
+
+    .field {
+        width: 100%;
+        background: rgba(0, 30, 0, .75);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        color: var(--text);
+        font-family: 'DM Mono', monospace;
+        font-size: 1rem;
+        padding: .65rem 2.8rem .65rem 1rem;
+        outline: none;
+        letter-spacing: .06em;
+        transition: border-color .15s, box-shadow .15s;
+    }
+
+
+    .field:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px rgba(212, 175, 55, .15), inset 0 0 12px rgba(212, 175, 55, .04);
+    }
+
+
+    .field.valid {
+        border-color: var(--green);
+        box-shadow: 0 0 0 2px rgba(125, 216, 122, .12);
+    }
+
+
+    .field.invalid {
+        border-color: var(--red);
+        box-shadow: 0 0 0 2px rgba(224, 96, 96, .12);
+    }
+
+
+    .field::placeholder {
+        color: var(--text-faint);
+        font-size: .9rem;
+    }
+
+
+    .datepicker-wrap {
+        position: relative;
+        z-index: 1;
+        width: 100%;
+        max-width: 300px;
+    }
+
+
+    .input-label {
+        font-size: .72rem;
+        letter-spacing: .15em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        margin-bottom: .5rem;
+    }
+
+
+    .input-wrap {
+        position: relative;
+    }
+
+
+    #triggerInput {
+        cursor: pointer;
+        caret-color: transparent;
+    }
+
+
+    #triggerInput:hover {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px rgba(212, 175, 55, .15);
+    }
+
+
+    .input-icon {
+        position: absolute;
+        right: .8rem;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: .85rem;
+        pointer-events: none;
+        transition: opacity .2s;
+    }
+
+
+    .input-icon.hidden {
+        opacity: 0;
+    }
+</style>
+

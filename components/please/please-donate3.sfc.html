@@ -1,0 +1,90 @@
+<template>
+    <div class="card">
+        <h1>Unterstütze mich mit einer Spende</h1>
+        <p>Wenn Dir mein Projekt gefällt und Du es unterstützen möchtest, freue ich mich über eine kleine Spende via PayPal.</p>
+
+        <a class="donate-btn" href="https://www.paypal.com/pools/c/9qHxx5hPUe" target="_blank" rel="noopener noreferrer">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M7.5 20.5H4.8c-.5 0-.9-.4-.8-.9L6.6 3.9c.1-.5.5-.8 1-.8h6.1c2.9 0 4.9 1.6 4.4 4.4-.5 3.2-2.8 4.9-5.9 4.9H10l-.9 4.4c-.1.5-.5.8-1 .8h-.6z" fill="#003087" />
+                <path d="M18.9 8.4c-.5 3.2-2.8 4.9-5.9 4.9h-1.8l-1 5.1c-.1.4-.4.7-.8.7H6.6c-.4 0-.7-.4-.6-.8l.5-2.6h2.4c.4 0 .8-.3.8-.7l.9-4.4h1.7c3 0 5.4-1.7 5.9-4.9v-.1c.4.4.6 1 .5 1.7z" fill="#0070ba" />
+            </svg>
+            Mit PayPal spenden
+        </a>
+
+        <div class="footnote">Sicher &amp; einfach über PayPal.me</div>
+    </div>
+</template>
+
+<style>
+    * {
+        box-sizing: border-box;
+    }
+
+    body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background: #f4f5f7;
+    }
+
+    .card {
+        background: #ffffff;
+        border-radius: 16px;
+        padding: 40px 36px;
+        max-width: 380px;
+        width: 90%;
+        text-align: center;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    }
+
+    .card h1 {
+        font-size: 1.4rem;
+        margin: 0 0 10px;
+        color: #1a1a1a;
+    }
+
+    .card p {
+        color: #555;
+        font-size: 0.95rem;
+        line-height: 1.5;
+        margin: 0 0 28px;
+    }
+
+    .donate-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        width: 100%;
+        padding: 14px 20px;
+        background: #ffc439;
+        color: #003087;
+        font-size: 1.05rem;
+        font-weight: 700;
+        text-decoration: none;
+        border-radius: 8px;
+        transition: background 0.2s ease, transform 0.1s ease;
+    }
+
+    .donate-btn:hover {
+        background: #ffb90f;
+    }
+
+    .donate-btn:active {
+        transform: scale(0.98);
+    }
+
+    .donate-btn svg {
+        height: 20px;
+        width: auto;
+    }
+
+    .footnote {
+        margin-top: 18px;
+        font-size: 0.78rem;
+        color: #999;
+    }
+</style>

@@ -1,0 +1,298 @@
+<template>
+    <section>
+        <header>
+            <h3>SQLite Workers</h3>
+            <div class="header-actions">
+                <label class="upload-label" title="Upload a .sqlite / .sqlite3 file">
+                    &#8593; Upload DB
+                    <input type="file" id="upload-input" accept=".sqlite,.sqlite3" />
+                </label>
+                <button type="button" id="refresh-btn" title="Refresh">&#8635;</button>
+            </div>
+        </header>
+        <ul id="worker-list"></ul>
+        <p id="empty-msg">No active workers.</p>
+    </section>
+    <sqlite-notes></sqlite-notes>
+</template>
+
+<script>
+    const { dispatchEvent, addEventListener } = window.eventbus;
+    const host = shadowDocument.host;
+
+    function render() {
+        const list = shadowDocument.querySelector('#worker-list');
+        const empty = shadowDocument.querySelector('#empty-msg');
+        const workers = sqlite.getWorkers();
+
+        list.replaceChildren();
+        empty.hidden = workers.size > 0;
+
+        for (const [name] of workers) {
+            const li = document.createElement('li');
+            li.innerHTML = `
+                <span class="worker-name">${name}</span>
+                <span class="badge">running</span>
+                <div class="row-actions">
+                    <button type="button" data-action="download" data-name="${name}" title="Export ${name}.sqlite3">&#8595; Download</button>
+                    <button type="button" data-action="close"    data-name="${name}" title="Close connection (keeps file)">&#9723; Close</button>
+                    // <button type="button" data-action="delete"   data-name="${name}" title="Delete database file">&#x1F5D1; Delete</button>
+                </div>
+            `;
+            list.appendChild(li);
+        }
+    }
+
+    // ── Bridges ──────────────────────────────────────────────────────────────
+
+    addEventListener('sqlite:upload', async (event) => {
+        const { fileName, arrayBuffer } = event.detail;
+        try {
+            const result = await sqlite.uploadDB(fileName, arrayBuffer);
+            dispatchEvent(new CustomEvent('sqlite:uploaded', { detail: { result } }));
+        } catch (error) {
+            dispatchEvent(new CustomEvent('sqlite:error', {
+                detail: { error: error.message, action: 'uploadDB', event }
+            }));
+        }
+    }, host);
+
+    addEventListener('sqlite:download', async (event) => {
+        const { name } = event.detail;
+        try {
+            await sqlite.downloadDB(name);
+            dispatchEvent(new CustomEvent('sqlite:downloaded', { detail: { name } }));
+        } catch (error) {
+            dispatchEvent(new CustomEvent('sqlite:error', {
+                detail: { error: error.message, action: 'downloadDB', event }
+            }));
+        }
+    }, host);
+
+    addEventListener('sqlite:closeDB', async (event) => {
+        const { name } = event.detail;
+        try {
+            await sqlite.closeDB(name);
+            dispatchEvent(new CustomEvent('sqlite:closed', { detail: { name } })); // broadcast
+        } catch (error) {
+            dispatchEvent(new CustomEvent('sqlite:error', {
+                detail: { error: error.message, action: 'closeDB', event }
+            }));
+        }
+    }, host);
+
+    addEventListener('sqlite:deleteDB', async (event) => {
+        const { name } = event.detail;
+        try {
+            await sqlite.deleteDB(name);
+            dispatchEvent(new CustomEvent('sqlite:deleted', { detail: { name } })); // broadcast
+        } catch (error) {
+            dispatchEvent(new CustomEvent('sqlite:error', {
+                detail: { error: error.message, action: 'deleteDB', event }
+            }));
+        }
+    }, host);
+
+    // ── Auto-refresh on broadcasts ────────────────────────────────────────────
+
+    addEventListener('sqlite:closed',   () => render(), host);
+    addEventListener('sqlite:deleted',  () => render(), host);
+    addEventListener('sqlite:uploaded', () => render(), host);
+
+    // ── UI interactions ───────────────────────────────────────────────────────
+
+    // Per-row action buttons
+    shadowDocument.querySelector('#worker-list').addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-action]');
+        if (!btn) return;
+        const { action, name } = btn.dataset;
+
+        if (action === 'download') {
+            dispatchEvent(
+                new CustomEvent('sqlite:download', { detail: { name, target: host } }),
+                host
+            );
+        } else if (action === 'close') {
+            dispatchEvent(
+                new CustomEvent('sqlite:closeDB', { detail: { name, target: host } }),
+                host
+            );
+        } else if (action === 'delete') {
+            if (!confirm(`Delete database "${name}"?\nThis removes the file from OPFS and cannot be undone.`)) return;
+            dispatchEvent(
+                new CustomEvent('sqlite:deleteDB', { detail: { name, target: host } }),
+                host
+            );
+        }
+    });
+
+    // Upload file input
+    shadowDocument.querySelector('#upload-input').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.addEventListener('load', (ev) => {
+            dispatchEvent(
+                new CustomEvent('sqlite:upload', {
+                    detail: { fileName: file.name, arrayBuffer: ev.target.result, target: host }
+                }),
+                host
+            );
+            e.target.value = ''; // allow re-uploading the same file
+        });
+        reader.readAsArrayBuffer(file);
+    });
+
+    // Manual refresh
+    shadowDocument.querySelector('#refresh-btn').addEventListener('click', render);
+
+    addEventListener('sqlite:error', (event) => {
+        const { error, action } = event.detail;
+        console.error(`sqlite-workers [${action}]:`, error);
+    }, host);
+
+    // Initial render
+    render();
+</script>
+
+<style>
+    section {
+        font-family: inherit;
+        border: 1px solid #333;
+        border-radius: 6px;
+        padding: 12px 16px;
+        min-width: 300px;
+    }
+
+    header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 12px;
+        gap: 8px;
+    }
+
+    h3 {
+        margin: 0;
+        font-size: 1rem;
+        white-space: nowrap;
+    }
+
+    .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    /* Hide the native file input; the label acts as the button */
+    #upload-input {
+        display: none;
+    }
+
+    .upload-label {
+        cursor: pointer;
+        border: 1px solid #555;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        padding: 3px 8px;
+        white-space: nowrap;
+        user-select: none;
+        color: #ccc;
+    }
+
+    .upload-label:hover {
+        background: #222;
+        border-color: #888;
+    }
+
+    #refresh-btn {
+        background: none;
+        border: 1px solid #555;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 1rem;
+        padding: 2px 6px;
+        line-height: 1;
+        color: #ccc;
+    }
+
+    #refresh-btn:hover {
+        background: #222;
+    }
+
+    #worker-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    #worker-list li {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 8px;
+        border-radius: 4px;
+        background: #111;
+        color: white;
+    }
+
+    .worker-name {
+        flex: 1;
+        font-family: monospace;
+        font-size: 0.9rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .badge {
+        flex-shrink: 0;
+        font-size: 0.7rem;
+        padding: 2px 6px;
+        border-radius: 10px;
+        background: #1a4a1a;
+        color: #4caf50;
+        border: 1px solid #2e7d32;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .row-actions {
+        display: flex;
+        gap: 4px;
+        flex-shrink: 0;
+    }
+
+    .row-actions button {
+        background: #1e1e1e;
+        border: 1px solid #555;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.72rem;
+        padding: 2px 6px;
+        color: #ccc;
+        white-space: nowrap;
+    }
+
+    .row-actions button:hover {
+        background: #2a2a2a;
+        border-color: #999;
+        color: #fff;
+    }
+
+    .row-actions [data-action="delete"]:hover {
+        border-color: #c62828;
+        color: #ef5350;
+        background: #1a0000;
+    }
+
+    #empty-msg {
+        margin: 0;
+        color: #666;
+        font-size: 0.85rem;
+        font-style: italic;
+    }
+</style>

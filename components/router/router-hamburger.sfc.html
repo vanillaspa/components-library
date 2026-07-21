@@ -1,0 +1,73 @@
+<template>
+    <div class="hamburger">
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+    </div>
+</template>
+
+<style>
+    :host {
+        cursor: pointer;
+        height: 70px;
+        overflow: visible;
+        position: fixed;
+        right: 0;
+        top: 0;
+        width: 70px;
+        z-index: 2;
+    }
+
+    .hamburger {
+        display: inline-block;
+        font-size: .5em;
+        height: 20px;
+        position: inherit;
+        right: 0;
+        top: 0;
+        transition: font-size .2s, width .2s, height .2s;
+        width: 20px;
+
+        .bar {
+            background-color: #144000;
+            height: .3em;
+            margin: .375em 0;
+            width: 2.5em;
+            transition: transform .2s;
+        }
+    }
+
+    :host(:hover) .hamburger {
+        font-size: 2em;
+        height: 70px;
+        transition: font-size .2s;
+        width: 70px;
+    }
+
+    :host(:hover) .bar {
+        background-color: #ffff00;
+        box-shadow: 0px 0px 10px #ffff00;
+    }
+
+    :host(:hover.open) .bar {
+        background-color: #ffff00;
+        box-shadow: 0px 0px 10px #ffff00;
+    }
+
+    :host(.open) .bar {
+        background-color: #ffd700;
+        transition: transform .2s;
+    }
+
+    :host(.open) .bar:nth-child(1) {
+        transform: translate(0, 0.7em) rotate(-45deg);
+    }
+
+    :host(.open) .bar:nth-child(2) {
+        opacity: 0;
+    }
+
+    :host(.open) .bar:nth-child(3) {
+        transform: translate(0, -0.7em) rotate(45deg);
+    }
+</style>

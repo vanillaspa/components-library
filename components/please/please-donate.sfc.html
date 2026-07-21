@@ -1,0 +1,49 @@
+<template>
+    <button id="donate-btn">
+        Donate to VanillaSPA
+    </button>
+</template>
+<script>
+    function sendDonation(email, currency) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = 'https://www.paypal.com/cgi-bin/webscr';
+
+        const params = {
+            cmd: '_donations',
+            business: email,
+            currency_code: currency,
+            item_name: 'Support VanillaSPA Development'
+        };
+
+        for (const [key, value] of Object.entries(params)) {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = key;
+            input.value = value;
+            form.appendChild(input);
+        }
+
+        document.body.appendChild(form);
+        form.submit();
+        document.body.removeChild(form);
+    };
+
+    const donateButton = shadowDocument.querySelector("#donate-btn");
+    donateButton.addEventListener("click", () => { sendDonation('robert.meissner@outlook.com', 'EUR') });
+</script>
+
+<style>
+    button {
+        background: #0070ba;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: bold;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+</style>

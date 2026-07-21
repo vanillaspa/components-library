@@ -1,0 +1,133 @@
+<template>
+    <div class="wrap">
+        <h3 class="title">⚔️ Combat</h3>
+        <p id="c-idle" class="idle">No active combat</p>
+        <div id="c-panel" class="panel hidden">
+            <div class="m-header">
+                <span class="m-icon">👹</span>
+                <span id="c-m-name" class="m-name"></span>
+            </div>
+            <div class="stat-block">
+                <label>HP</label>
+                <div class="bar-track"><div id="c-m-hp-bar" class="bar-fill"></div></div>
+                <span id="c-m-hp-text" class="bar-lbl"></span>
+            </div>
+            <div id="c-turn" class="turn player-turn">⚔️ Your turn!</div>
+            <div class="actions">
+                <button type="button" id="c-attack" class="btn btn-attack">⚔️ Attack</button>
+                <button type="button" id="c-flee"   class="btn btn-flee">🏃 Flee</button>
+            </div>
+        </div>
+    </div>
+</template>
+
+<script>
+    const { addEventListener: busListen, dispatchEvent: busDispatch } = window.eventbus;
+    const { commands, notifications } = window.HeroContract;
+    const host      = shadowDocument.host;
+    const panel     = shadowDocument.getElementById('c-panel');
+    const idleMsg   = shadowDocument.getElementById('c-idle');
+    const mName     = shadowDocument.getElementById('c-m-name');
+    const mHpBar    = shadowDocument.getElementById('c-m-hp-bar');
+    const mHpText   = shadowDocument.getElementById('c-m-hp-text');
+    const turnEl    = shadowDocument.getElementById('c-turn');
+    const attackBtn = shadowDocument.getElementById('c-attack');
+    const fleeBtn   = shadowDocument.getElementById('c-flee');
+
+    attackBtn.addEventListener('click', () =>
+        busDispatch(new CustomEvent(commands.ATTACK))
+    );
+    fleeBtn.addEventListener('click', () =>
+        busDispatch(new CustomEvent(commands.FLEE))
+    );
+
+    busListen(notifications.STATE, (e) => {
+        const { combat, hero } = e.detail;
+        if (!combat || hero.hp <= 0) {
+            panel.classList.add('hidden');
+            idleMsg.classList.remove('hidden');
+            return;
+        }
+        idleMsg.classList.add('hidden');
+        panel.classList.remove('hidden');
+
+        mName.textContent = combat.monster.name;
+
+        const pct = Math.max(0, (combat.monster.hp / combat.monster.maxHp) * 100);
+        mHpBar.style.width  = `${pct}%`;
+        mHpText.textContent = `${combat.monster.hp}/${combat.monster.maxHp}`;
+
+        const myTurn = combat.turn === 'player';
+        turnEl.textContent = myTurn ? '⚔️ Your turn!' : "⏳ Monster's turn…";
+        turnEl.className   = 'turn ' + (myTurn ? 'player-turn' : 'monster-turn');
+        attackBtn.disabled = !myTurn;
+        fleeBtn.disabled   = !myTurn;
+    }, host);
+</script>
+
+<style>
+    :host { display: block; }
+
+    .title {
+        color: #e94560;
+        margin: 0 0 0.5rem;
+        font-size: 0.95rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .idle { font-size: 0.8rem; color: #555; margin: 0; }
+
+    .panel { display: flex; flex-direction: column; gap: 0.5rem; }
+    .panel.hidden { display: none; }
+
+    .m-header { display: flex; align-items: center; gap: 0.4rem; }
+    .m-icon   { font-size: 1.6rem; }
+    .m-name   { font-weight: 700; color: #e94560; font-size: 1rem; }
+
+    .stat-block {
+        display: grid;
+        grid-template-columns: 22px 1fr 56px;
+        align-items: center;
+        gap: 0.35rem;
+        font-size: 0.75rem;
+    }
+    label { color: #aaa; font-weight: 600; }
+
+    .bar-track {
+        background: #0d0d1a;
+        border-radius: 999px;
+        height: 9px;
+        overflow: hidden;
+        border: 1px solid #333;
+    }
+    .bar-fill { height: 100%; border-radius: 999px; background: #e94560; transition: width 0.3s; }
+    .bar-lbl  { font-size: 0.68rem; color: #aaa; text-align: right; white-space: nowrap; }
+
+    .turn {
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-align: center;
+        padding: 0.25rem;
+        border-radius: 0.25rem;
+    }
+    .player-turn  { color: #4caf50; background: #0d1f0d; }
+    .monster-turn { color: #e94560; background: #1f0d0d; }
+
+    .actions { display: flex; gap: 0.5rem; }
+
+    .btn {
+        flex: 1;
+        border: none;
+        border-radius: 0.375rem;
+        padding: 0.5rem 0;
+        font-size: 0.85rem;
+        cursor: pointer;
+        font-weight: 600;
+        transition: filter 0.15s;
+    }
+    .btn:hover:not(:disabled) { filter: brightness(1.2); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-attack { background: #e94560; color: #fff; }
+    .btn-flee   { background: #334; color: #ffd700; border: 1px solid #ffd70044; }
+</style>
