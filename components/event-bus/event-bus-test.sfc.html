@@ -1,0 +1,179 @@
+<template>
+    <div class="test-page">
+        <header class="page-header">
+            <h1>Event Bus Communication Test</h1>
+            <p>Testing inter-component communication using @vanillaspa/event-bus</p>
+        </header>
+
+        <section class="guide">
+            <h2>Basic Event Communication</h2>
+            <ol>
+                <li><strong>Publisher</strong> sends messages to the event bus</li>
+                <li><strong>Subscriber</strong> listens and displays messages in real-time</li>
+                <li><strong>Counter</strong> maintains shared state across multiple listeners</li>
+            </ol>
+            <p>All components are independent but communicate through events, demonstrating decoupled architecture.</p>
+        </section>
+
+        <div class="components">
+            <event-bus-publisher></event-bus-publisher>
+            <event-bus-subscriber></event-bus-subscriber>
+            <event-bus-counter></event-bus-counter>
+        </div>
+
+        <section class="code-reference">
+            <h2>API Reference</h2>
+
+            <h3>Basic Pattern (Publisher-Subscriber)</h3>
+            <pre><code>// Register a listener for an event type
+eventbus.addEventListener('app:message', (event) => {
+    console.log(event.detail);
+}, shadowDocument.host);
+
+// Dispatch an event
+const event = new CustomEvent('app:message', {
+    detail: { text: 'Hello', timestamp: Date.now() }
+});
+eventbus.dispatchEvent(event);
+
+// Remove a specific listener
+eventbus.removeEventListener('app:message', handler, shadowDocument.host);
+
+// Auto-cleanup: listeners are removed when component disconnects</code></pre>
+        </section>
+    </div>
+</template>
+
+<style>
+    :host {
+        display: block;
+        padding: 20px;
+        background-color: #f9fafb;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .test-page {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    .page-header {
+        text-align: center;
+        margin-bottom: 40px;
+        padding-bottom: 30px;
+        border-bottom: 2px solid #e5e7eb;
+    }
+
+    .page-header h1 {
+        margin: 0 0 8px 0;
+        font-size: 32px;
+        color: #1f2937;
+        font-weight: 700;
+    }
+
+    .page-header p {
+        margin: 0;
+        font-size: 16px;
+        color: #6b7280;
+    }
+
+    .guide {
+        background-color: #f0f4ff;
+        border-left: 4px solid #3b82f6;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 40px;
+    }
+
+    .guide h2 {
+        margin: 0 0 12px 0;
+        font-size: 18px;
+        color: #1e40af;
+    }
+
+    .guide ol {
+        margin: 0 0 16px 0;
+        padding-left: 20px;
+        color: #374151;
+        line-height: 1.8;
+    }
+
+    .guide li {
+        margin-bottom: 8px;
+    }
+
+    .guide strong {
+        color: #1e40af;
+    }
+
+    .guide p {
+        margin: 0;
+        color: #4b5563;
+        font-size: 14px;
+    }
+
+    .components {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+        gap: 20px;
+        margin-bottom: 40px;
+    }
+
+    .contract-components {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+        gap: 20px;
+        margin-bottom: 40px;
+    }
+
+    @media (max-width: 900px) {
+        .components {
+            grid-template-columns: 1fr;
+        }
+
+        .contract-components {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .code-reference {
+        background-color: #1f2937;
+        border-radius: 8px;
+        padding: 20px;
+        overflow-x: auto;
+        margin-bottom: 20px;
+    }
+
+    .code-reference h2 {
+        margin: 0 0 16px 0;
+        color: #f3f4f6;
+        font-size: 18px;
+    }
+
+    .code-reference h3 {
+        margin: 20px 0 12px 0;
+        color: #93c5fd;
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    .code-reference h3:first-of-type {
+        margin-top: 0;
+    }
+
+    .code-reference pre {
+        margin: 0;
+        font-family: 'Monaco', 'Courier New', monospace;
+        font-size: 12px;
+        color: #d1d5db;
+        line-height: 1.5;
+        background-color: #111827;
+        padding: 12px;
+        border-radius: 6px;
+        border-left: 3px solid #3b82f6;
+    }
+
+    .code-reference code {
+        color: #d1d5db;
+    }
+</style>

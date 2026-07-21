@@ -1,73 +1,58 @@
 <template>
     <div class="hamburger">
-        <div class="bar"></div>
-        <div class="bar"></div>
-        <div class="bar"></div>
+        <span class="hamburger-line"></span>
+        <span class="hamburger-line"></span>
+        <span class="hamburger-line"></span>
     </div>
 </template>
 
 <style>
     :host {
         cursor: pointer;
-        height: 70px;
-        overflow: visible;
-        position: fixed;
-        right: 0;
-        top: 0;
-        width: 70px;
-        z-index: 2;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.25rem;
+        border: 1px solid rgba(212, 175, 55, 0.3);
+        border-radius: 999px;
+        background: rgba(212, 175, 55, 0.08);
     }
 
     .hamburger {
-        display: inline-block;
-        font-size: .5em;
-        height: 20px;
-        position: inherit;
-        right: 0;
-        top: 0;
-        transition: font-size .2s, width .2s, height .2s;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        padding: 0.35rem;
+    }
+
+    .hamburger-line {
         width: 20px;
-
-        .bar {
-            background-color: #144000;
-            height: .3em;
-            margin: .375em 0;
-            width: 2.5em;
-            transition: transform .2s;
-        }
+        height: 2px;
+        background-color: #f0d060;
+        border-radius: 2px;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        transform-origin: center center;
     }
 
-    :host(:hover) .hamburger {
-        font-size: 2em;
-        height: 70px;
-        transition: font-size .2s;
-        width: 70px;
+    :host(:hover) {
+        border-color: rgba(212, 175, 55, 0.8);
     }
 
-    :host(:hover) .bar {
-        background-color: #ffff00;
-        box-shadow: 0px 0px 10px #ffff00;
+    :host(.open) .hamburger-line:nth-child(1) {
+        transform: translateY(6px) rotate(45deg);
     }
 
-    :host(:hover.open) .bar {
-        background-color: #ffff00;
-        box-shadow: 0px 0px 10px #ffff00;
-    }
-
-    :host(.open) .bar {
-        background-color: #ffd700;
-        transition: transform .2s;
-    }
-
-    :host(.open) .bar:nth-child(1) {
-        transform: translate(0, 0.7em) rotate(-45deg);
-    }
-
-    :host(.open) .bar:nth-child(2) {
+    :host(.open) .hamburger-line:nth-child(2) {
         opacity: 0;
     }
 
-    :host(.open) .bar:nth-child(3) {
-        transform: translate(0, -0.7em) rotate(45deg);
+    :host(.open) .hamburger-line:nth-child(3) {
+        transform: translateY(-6px) rotate(-45deg);
+    }
+
+    @media (min-width: 769px) {
+        :host {
+            display: none;
+        }
     }
 </style>

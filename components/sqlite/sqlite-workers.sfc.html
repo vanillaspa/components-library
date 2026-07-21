@@ -13,7 +13,7 @@
         <ul id="worker-list"></ul>
         <p id="empty-msg">No active workers.</p>
     </section>
-    <sqlite-notes></sqlite-notes>
+    <graphql-multiapi></graphql-multiapi>
 </template>
 
 <script>
@@ -36,7 +36,7 @@
                 <div class="row-actions">
                     <button type="button" data-action="download" data-name="${name}" title="Export ${name}.sqlite3">&#8595; Download</button>
                     <button type="button" data-action="close"    data-name="${name}" title="Close connection (keeps file)">&#9723; Close</button>
-                    // <button type="button" data-action="delete"   data-name="${name}" title="Delete database file">&#x1F5D1; Delete</button>
+                    <button type="button" data-action="delete"   data-name="${name}" title="Delete database file">&#x1F5D1; Delete</button>
                 </div>
             `;
             list.appendChild(li);

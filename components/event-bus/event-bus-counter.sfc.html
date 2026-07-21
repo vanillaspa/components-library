@@ -1,0 +1,132 @@
+<template>
+    <div class="counter">
+        <h2>Counter (Shared State)</h2>
+        <div class="stats-grid">
+            <div class="stat-box">
+                <div class="stat-label">Total Messages</div>
+                <div class="stat-value total-messages">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Total Words</div>
+                <div class="stat-value total-words">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Total Characters</div>
+                <div class="stat-value total-chars">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Avg Length</div>
+                <div class="stat-value avg-length">0</div>
+            </div>
+        </div>
+        <div class="info">
+            <p>This component listens to the same events and maintains a shared state view across all subscribers.</p>
+        </div>
+    </div>
+</template>
+
+<script>
+    let stats = {
+        messages: 0,
+        words: 0,
+        chars: 0
+    };
+
+    const messagesDisplay = shadowDocument.querySelector('.total-messages');
+    const wordsDisplay = shadowDocument.querySelector('.total-words');
+    const charsDisplay = shadowDocument.querySelector('.total-chars');
+    const avgDisplay = shadowDocument.querySelector('.avg-length');
+
+    const handler = (event) => {
+        const text = event.detail.text;
+        stats.messages++;
+        stats.words += text.trim().split(/\s+/).length;
+        stats.chars += text.length;
+
+        messagesDisplay.textContent = stats.messages;
+        wordsDisplay.textContent = stats.words;
+        charsDisplay.textContent = stats.chars;
+
+        const avgLen = stats.chars / stats.messages;
+        avgDisplay.textContent = avgLen.toFixed(1);
+
+        // Pulse effect
+        messagesDisplay.closest('.stat-box').classList.add('pulse');
+        setTimeout(() => {
+            messagesDisplay.closest('.stat-box').classList.remove('pulse');
+        }, 300);
+    };
+
+    eventbus.addEventListener('app:message', handler, shadowDocument.host);
+</script>
+
+<style>
+    :host {
+        display: block;
+        padding: 20px;
+        border: 2px solid #f59e0b;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #fef3c7 0%, #fefce8 100%);
+    }
+
+    .counter h2 {
+        margin: 0 0 16px 0;
+        font-size: 18px;
+        color: #b45309;
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .stat-box {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        background-color: white;
+        border: 1px solid #fcd34d;
+        border-radius: 8px;
+        transition: all 0.3s;
+    }
+
+    .stat-box.pulse {
+        transform: scale(1.05);
+        border-color: #f59e0b;
+        box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2);
+    }
+
+    .stat-label {
+        font-size: 11px;
+        color: #92400e;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 8px;
+        text-align: center;
+    }
+
+    .stat-value {
+        font-size: 28px;
+        font-weight: 700;
+        color: #f59e0b;
+    }
+
+    .info {
+        padding: 12px 16px;
+        background-color: rgba(245, 158, 11, 0.1);
+        border-left: 4px solid #f59e0b;
+        border-radius: 4px;
+    }
+
+    .info p {
+        margin: 0;
+        font-size: 13px;
+        color: #78350f;
+        line-height: 1.5;
+    }
+</style>

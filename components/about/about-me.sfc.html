@@ -1,0 +1,360 @@
+<template>
+    <section class="about-shell">
+        <div class="hero-panel">
+            <div class="scanline"></div>
+            <p class="eyebrow">// about / profile</p>
+            <h1>Jahrome <span>builds resilient web systems.</span></h1>
+            <p class="lead">
+                I design fast, secure, and elegant interfaces that feel effortless to use. My work sits at the intersection of product thinking, browser-native engineering, and local-first architecture.
+            </p>
+            <div class="cta-row">
+                <a class="primary-link" href="/persistence">Explore the stack</a>
+                <a class="ghost-link" href="/">Back to home</a>
+            </div>
+        </div>
+
+        <div class="stats-grid">
+            <article class="stat-card">
+                <span class="label">Focus</span>
+                <strong>Performance & trust</strong>
+                <p>Low-latency experiences with deliberate UX and strong technical foundations.</p>
+            </article>
+            <article class="stat-card">
+                <span class="label">Craft</span>
+                <strong>Browser-native apps</strong>
+                <p>Web components, offline workflows, and local storage patterns that stay fast.</p>
+            </article>
+            <article class="stat-card">
+                <span class="label">Mission</span>
+                <strong>Ship clean, durable software</strong>
+                <p>Build with clarity, iterate with discipline, and keep the user experience sharp.</p>
+            </article>
+        </div>
+
+        <div class="detail-grid">
+            <article class="detail-card">
+                <h2>What I build</h2>
+                <ul>
+                    <li>Immersive product interfaces with a clear visual language</li>
+                    <li>Developer tooling that feels as sharp as the product it supports</li>
+                    <li>Local-first systems that remain useful even with flaky connectivity</li>
+                </ul>
+            </article>
+
+            <article class="detail-card">
+                <h2>Current stack</h2>
+                <div class="chip-row">
+                    <a href="https://github.com/vanillaspa"><span class="chip">Vanilla SPA</span></a>
+                    <a href="https://github.com/vanillaspa/web-components"><span class="chip">Web Components</span></a>
+                    <a href="https://github.com/vanillaspa/sqlite-opfs"><span class="chip">SQLite / OPFS</span></a>
+                    <a href="https://github.com/vanillaspa/event-bus"><span class="chip">Event Bus</span></a>
+                </div>
+            </article>
+        </div>
+
+        <footer class="footer">
+            <span>Available for ambitious product work</span>
+            <span>Built with discipline · <span id="year"></span></span>
+        </footer>
+    </section>
+</template>
+
+<script>
+    const yearEl = shadowDocument.getElementById('year');
+    if (yearEl) {
+        yearEl.textContent = new Date().getFullYear();
+    }
+</script>
+
+<style>
+    :host {
+        --border: rgba(79, 125, 88, .22);
+        --border-bright: rgba(79, 125, 88, .35);
+        --accent: #4f7d58;
+        --accent-light: #2f5b3c;
+        --accent-dim: #60996a;
+        --text: #17301d;
+        --text-muted: #385443;
+        --text-faint: #6a7f6c;
+        --bg-deep: #f7f3e8;
+        --bg-panel: rgba(255, 255, 255, .9);
+        --bg-glass: rgba(255, 255, 255, .82);
+        --green: #4f7d58;
+        --radius: 12px;
+        display: block;
+        color-scheme: light;
+    }
+
+    :host(.theme-dark) {
+        --border: rgba(180, 150, 30, .55);
+        --border-bright: rgba(212, 175, 55, .75);
+        --accent: #d4af37;
+        --accent-light: #f0d060;
+        --accent-dim: #c8a030;
+        --text: #f5e9b0;
+        --text-muted: #cce89a;
+        --text-faint: #7aaa50;
+        --bg-deep: #071400;
+        --bg-panel: rgba(7, 20, 0, .86);
+        --bg-glass: rgba(0, 30, 0, .72);
+        --green: #96f092;
+        color-scheme: dark;
+    }
+
+    * {
+        box-sizing: border-box;
+    }
+
+    .about-shell {
+        min-height: calc(100vh - 70px);
+        width: 100%;
+        padding: 1rem 1rem 2rem;
+        font-family: 'DM Mono', monospace;
+        color: var(--text);
+        background:
+            radial-gradient(ellipse at 20% 0%, rgba(79, 125, 88, .16) 0%, transparent 48%),
+            radial-gradient(ellipse at 80% 100%, rgba(79, 125, 88, .12) 0%, transparent 48%),
+            linear-gradient(135deg, var(--bg-deep) 0%, color-mix(in srgb, var(--bg-deep) 85%, white 15%) 45%, var(--bg-deep) 100%);
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .about-shell::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.6' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+        pointer-events: none;
+        opacity: .8;
+    }
+
+    .hero-panel,
+    .stat-card,
+    .detail-card,
+    .footer {
+        position: relative;
+        z-index: 1;
+    }
+
+    .hero-panel {
+        border: 1px solid var(--border-bright);
+        border-radius: var(--radius);
+        padding: 1.25rem;
+        background: linear-gradient(135deg, var(--bg-panel) 0%, color-mix(in srgb, var(--bg-panel) 88%, black 12%) 100%);
+        box-shadow:
+            0 2px 0 rgba(212, 175, 55, .22),
+            0 18px 60px rgba(0, 0, 0, .45),
+            inset 0 1px 0 rgba(212, 175, 55, .2);
+        overflow: hidden;
+        width: 100%;
+    }
+
+    .scanline {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(180deg, transparent 0%, rgba(255, 255, 255, .03) 50%, transparent 100%);
+        pointer-events: none;
+        mix-blend-mode: screen;
+    }
+
+    .eyebrow {
+        margin: 0 0 1rem;
+        font-size: .78rem;
+        letter-spacing: .24em;
+        text-transform: uppercase;
+        color: var(--accent-light);
+    }
+
+    h1 {
+        margin: 0 0 1rem;
+        font-size: clamp(2rem, 3.6vw, 3.1rem);
+        line-height: 1.06;
+        letter-spacing: -.03em;
+    }
+
+    h1 span {
+        display: block;
+        margin-top: .35rem;
+        color: var(--accent-light);
+        font-size: clamp(1.1rem, 1.8vw, 1.35rem);
+        font-weight: 600;
+    }
+
+    .lead {
+        max-width: 760px;
+        margin: 0;
+        line-height: 1.8;
+        color: var(--text);
+        font-size: 1rem;
+    }
+
+    .cta-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .75rem;
+        margin-top: 1.4rem;
+    }
+
+    .primary-link,
+    .ghost-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: .7rem 1rem;
+        border-radius: 999px;
+        border: 1px solid var(--border-bright);
+        font-size: .95rem;
+        text-decoration: none;
+        transition: transform .2s ease, border-color .2s ease, background .2s ease;
+    }
+
+    .primary-link {
+        background: linear-gradient(135deg, rgba(212, 175, 55, .22), rgba(212, 175, 55, .1));
+        color: var(--text);
+    }
+
+    .ghost-link {
+        color: var(--text-muted);
+        background: rgba(0, 0, 0, .18);
+    }
+
+    .primary-link:hover,
+    .ghost-link:hover {
+        transform: translateY(-1px);
+        border-color: var(--accent);
+    }
+
+    .stats-grid {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: 1fr;
+    }
+
+    .stat-card,
+    .detail-card {
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 1.15rem 1.2rem;
+        background: var(--bg-glass);
+        box-shadow: inset 0 1px 0 rgba(212, 175, 55, .08);
+    }
+
+    .label {
+        display: block;
+        margin-bottom: .45rem;
+        font-size: .72rem;
+        letter-spacing: .24em;
+        text-transform: uppercase;
+        color: var(--accent-light);
+    }
+
+    .stat-card strong {
+        display: block;
+        margin-bottom: .45rem;
+        color: var(--text);
+        font-size: 1rem;
+    }
+
+    .stat-card p,
+    .detail-card li {
+        margin: 0;
+        line-height: 1.7;
+        color: var(--text-muted);
+        font-size: .95rem;
+    }
+
+    .detail-grid {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: 1fr;
+    }
+
+    .detail-card h2 {
+        margin: 0 0 .9rem;
+        font-size: 1rem;
+        letter-spacing: .12em;
+        text-transform: uppercase;
+        color: var(--accent-light);
+    }
+
+    .detail-card ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: grid;
+        gap: .6rem;
+    }
+
+    .detail-card li {
+        padding-left: 1rem;
+        position: relative;
+    }
+
+    .detail-card li::before {
+        content: '›';
+        position: absolute;
+        left: 0;
+        color: var(--accent);
+    }
+
+    .chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .55rem;
+    }
+
+    .chip {
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: .45rem .75rem;
+        color: var(--text);
+        background: rgba(212, 175, 55, .08);
+        font-size: .83rem;
+    }
+
+    .footer {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+        padding-top: 1rem;
+        border-top: 1px solid rgba(212, 175, 55, .2);
+        color: var(--text-faint);
+        font-size: .85rem;
+    }
+
+    @media (min-width: 700px) {
+        .about-shell {
+            padding: 1.5rem 1.5rem 2.5rem;
+        }
+
+        .hero-panel {
+            padding: 2rem;
+        }
+
+        .stats-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .detail-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (min-width: 1024px) {
+        .about-shell {
+            padding: 2rem 2.25rem 3rem;
+        }
+
+        .hero-panel {
+            padding: 2.6rem;
+        }
+
+        .stats-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+    }
+</style>

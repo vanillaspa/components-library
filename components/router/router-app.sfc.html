@@ -1,15 +1,23 @@
 <template>
-    <router-hamburger></router-hamburger>
-    <nav>
-        <ul>
-            <li><a href="/sqlite">SQLite</a></li>
-            <li><a href="/opfs">OPFS</a></li>
-            <li><a href="/dragndrop">Drag'n Drop Demo</a></li>
-            <li><a href="/test">Test</a></li>
-            <li><a href="/hero">Hero Quest</a></li>
-        </ul>
-    </nav>
-    <main></main>
+    <header class="navbar">
+        <div class="navbar-container">
+            <div class="navbar-brand">
+                <a href="/" class="home-link"><span class="logo">Jahrome</span></a>
+            </div>
+            <div class="navbar-actions">
+                <theme-switch></theme-switch>
+                <router-hamburger></router-hamburger>
+            </div>
+            <nav class="nav-menu">
+                <ul>
+                    <li><a href="/about" class="nav-link">About</a></li>
+                    <li><a href="/persistence" class="nav-link">Persistence</a></li>
+                    <li><a href="/dragndrop" class="nav-link">Drag & Drop</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+    <main class="main-content"></main>
 </template>
 
 <script>
@@ -21,46 +29,97 @@
         };
     })(window.history);
 
-    let _sitemap = [[
-        { "/": { "title": "Home", "template": "home-page" } }
-    ],
-    [
-        { "/sqlite": { "title": "SQLite", "template": "sqlite-workers" } },
-        { "/opfs": { "title": "OPFS", "template": "opfs-admin" } },
-        { "/dragndrop": { "title": "Drag'nDrop", "template": "dragndrop-container" } },
-        { "/test": { "title": "Test", "template": "test-page" } },
-        { "/hero": { "title": "Hero Quest", "template": "hero-quest" } }
-    ]];
+    let _sitemap = [
+        { "title": "Home", "template": "home-page" },
+        {
+            "about": { "title": "About", "template": "about-me" },
+            "persistence": { "title": "Persistence", "template": "sqlite-workers" },
+            "dragndrop": { "title": "DragnDrop", "template": "dragndrop-container" },
+        }
+    ];
 
-    function getMapping(pathname) {
-        let errorMapping = { "title": "404", "template": "error-404" };  // default
-        let mapping = errorMapping;
-        let resources = pathname.split("/");
-        if (resources[1]) { // find URL in sitemap
-            for (let route of _sitemap[resources.length - 1]) {
-                if (route[pathname]) { mapping = route[pathname]; } // found
+    let errorMapping = { "template": "error-404" };
+
+    function getMapping(pathname) { // "/project/plan"
+        let level = 0;
+        let mapping = _sitemap[level]; // { "template": "home-page" }
+        let resources = pathname.split("/"); // ["", "project", "plan"]
+        let step = resources[level]; // ""
+        let lastStep = step;
+        if (pathname == "/") {
+            return mapping;
+        }
+
+        while (++level < resources.length) {
+            step = resources[level]; // "plan"
+            if (level == 1) {
+                if (step in _sitemap[level]) {
+                    mapping = _sitemap[level][step];
+                } else {
+                    mapping = errorMapping;
+                }
+            } else {
+                if (step in _sitemap[level][lastStep]) {
+                    mapping = _sitemap[level][lastStep][step];
+                } else {
+                    mapping = errorMapping;
+                }
             }
-        } else { mapping = _sitemap[0][0][pathname] } // single /
+            lastStep = step;
+        }
+
         if (!customElements.get(mapping.template)) { return errorMapping; }
         return mapping;
     }
 
-    const main = shadowDocument.querySelector("main");
+    const main = shadowDocument.querySelector(".main-content");
+    const hostEl = shadowDocument.host;
+    const storageKey = 'app-theme';
+
+    function syncThemeToElement(el) {
+        if (!el) return;
+        const theme = localStorage.getItem(storageKey) || 'light';
+        el.classList.toggle('theme-dark', theme === 'dark');
+        el.classList.toggle('theme-light', theme === 'light');
+        el.dataset.theme = theme;
+    }
+
+    function applyTheme(theme) {
+        const nextTheme = theme === 'dark' ? 'dark' : 'light';
+        const previousTheme = document.documentElement.dataset.theme || localStorage.getItem(storageKey) || 'light';
+        localStorage.setItem(storageKey, nextTheme);
+        document.documentElement.classList.toggle('dark', nextTheme === 'dark');
+        document.documentElement.classList.toggle('theme-dark', nextTheme === 'dark');
+        document.documentElement.classList.toggle('theme-light', nextTheme === 'light');
+        document.documentElement.dataset.theme = nextTheme;
+        document.documentElement.style.colorScheme = nextTheme;
+        hostEl.classList.toggle('theme-dark', nextTheme === 'dark');
+        hostEl.classList.toggle('theme-light', nextTheme === 'light');
+        hostEl.dataset.theme = nextTheme;
+        Array.from(main.children).forEach(syncThemeToElement);
+        if (previousTheme !== nextTheme) {
+            window.dispatchEvent(new CustomEvent('app:theme-change', { detail: { theme: nextTheme } }));
+        }
+    }
+
     function loadContent(e) {
         let mapping = getMapping(location.pathname);
-        main.replaceChildren(document.createElement(mapping.template));
+        const nextComponent = document.createElement(mapping.template);
+        syncThemeToElement(nextComponent);
+        main.replaceChildren(nextComponent);
     }
 
     function activate(e) {
-        shadowDocument.querySelector(".active")?.classList.remove("active");
-        for (let a of shadowDocument.querySelectorAll('a')) {
+        shadowDocument.querySelector(".nav-link.active")?.classList.remove("active");
+        for (let a of shadowDocument.querySelectorAll('.nav-link')) {
             if (location.pathname.includes(a.getAttribute("href"))) {
-                a.closest("li").classList.add("active");
+                a.classList.add("active");
                 break;
             }
         }
     }
 
+    applyTheme(localStorage.getItem(storageKey) || 'light');
     loadContent();
     addEventListener("popstate", loadContent);
     addEventListener("pushstate", loadContent);
@@ -70,234 +129,209 @@
     addEventListener("pushstate", activate);
 
     const hamburger = shadowDocument.querySelector("router-hamburger");
-    const nav = shadowDocument.querySelector("nav");
+    const navMenu = shadowDocument.querySelector(".nav-menu");
+    window.addEventListener('app:theme-change', e => {
+        applyTheme(e.detail?.theme || 'light');
+    });
     hamburger.addEventListener("click", function onHamburgerClicked(e) {
         e.preventDefault();
         hamburger.classList.toggle("open");
-        nav.classList.toggle("open");
+        navMenu.classList.toggle("open");
     });
 
     function onLinkClick(e) {
         e.preventDefault();
         e.stopImmediatePropagation();
-        let li = e.target.closest("li");
-        let a = li.querySelector("a");
+        let a = e.target.closest("a");
         let pathname = a.getAttribute("href");
-        let mapping = getMapping(pathname);
-        history.pushState(mapping.template, mapping.title, pathname);
+        link(pathname);
     }
 
-    const links = shadowDocument.querySelectorAll("li");
-    links.forEach(li => {
-        li.addEventListener("click", onLinkClick);
-        let a = li.querySelector("a");
-        a.addEventListener("click", onLinkClick); // UX, for closest("li") in onLinkClick
+    eventbus.addEventListener('router:link', linkEvent, shadowDocument.host);
+
+    function linkEvent(e) {
+        link(e.detail.pathname);
+    }
+    function link(pathname) {
+        console.log({pathname});
+        let mapping = getMapping(pathname);
+        console.log({ mapping });
+        history.pushState(mapping.template, mapping.title, pathname);
+    }
+    const links = shadowDocument.querySelectorAll(".nav-link, .home-link");
+    links.forEach(a => {
+        a.addEventListener("click", onLinkClick);
     });
 
     // workaround to access at least the first routing level when url entered into browser's address bar 
-    const resources = (location.pathname).split("/");
-    if (resources.length > 2) { push(resources.slice(0, 2).join("/")); }
+    // const resources = (location.pathname).split("/");
+    // if (resources.length > 2) { push(resources.slice(0, 2).join("/")); }
 </script>
 
 <style>
-    nav {
-        &.open {
-            transform: translateY(0);
-        }
-
-        display: flex;
-        transform: translateY(calc(-100% - 30px));
-        transition: transform 1s ease-in-out;
-        width: 100%;
-        z-index: 1;
-
-        position: sticky;
-        top: 0;
-
-        ul {
-            display: flex;
-            flex-flow: column nowrap;
-            list-style: none;
-            margin: 0;
-            padding: 0;
-            width: inherit;
-
-            li {
-                background-color: transparent;
-                border-top: 15px solid transparent;
-                border-right: 50vw solid #144000;
-                border-bottom: 0px solid #144000;
-                border-left: 50vw solid #144000;
-                cursor: pointer;
-                display: flex;
-                flex-flow: row nowrap;
-                justify-content: center;
-                height: 50px;
-                position: relative;
-                z-index: 0;
-
-                &::after {
-                    position: absolute;
-                    border-top: 15px solid #144000;
-                    border-left: 50vw solid transparent;
-                    border-right: 50vw solid transparent;
-                    border-bottom: 0 solid transparent;
-                    content: "";
-                    display: block;
-                    top: 50px;
-                }
-
-
-                &:hover {
-                    border-left: 50vw solid #ffff00;
-                    border-right: 50vw solid #ffff00;
-                    border-bottom: 0px solid #ffff00;
-                    position: relative;
-                    z-index: 1;
-
-                    &::after {
-                        border-top: 15px solid #ffff00;
-                        z-index: 1;
-                    }
-
-                    a {
-                        opacity: 1 !important;
-                        color: #144000;
-                    }
-                }
-
-                a {
-                    color: #ffd700;
-                    text-decoration: none;
-                    font-weight: bold;
-                    align-self: center;
-                    line-height: 30px;
-                    font-size: 30px;
-                    white-space: nowrap;
-
-                    &:hover {
-                        text-shadow: 0px 0px 8px #144000;
-                        transition: text-shadow .2s ease-in .05s;
-                    }
-                }
-
-                &.active {
-                    border-top: 15px solid transparent;
-                    border-left: 50vw solid #ffd700;
-                    border-right: 50vw solid #ffd700;
-                    border-bottom: 0px solid #ffd700;
-                    position: relative;
-                    z-index: 1;
-
-                    &::after {
-                        border-top: 15px solid #ffd700;
-                    }
-
-                    &:hover {
-                        border-top: 15px solid transparent;
-                        border-left: 50vw solid #ffff00;
-                        border-right: 50vw solid #ffff00;
-                        border-bottom: 0px solid #ffff00;
-
-                        &::after {
-                            border-top: 15px solid #ffff00;
-                        }
-                    }
-
-                    a {
-                        color: #144000;
-                    }
-                }
-            }
-        }
+    :host {
+        --bg: #071400;
+        --bg-panel: rgba(0, 30, 0, 0.85);
+        --border: rgba(180, 150, 30, 0.55);
+        --border-bright: rgba(212, 175, 55, 0.75);
+        --accent: #d4af37;
+        --accent-light: #f0d060;
+        --text: #f5e9b0;
+        --text-muted: #cce89a;
+        --text-faint: #7aaa50;
+        display: block;
+        font-family: 'DM Mono', monospace;
     }
 
-    @media only screen and (min-width: 600px) {
-        nav {
-            overflow: hidden;
+    .navbar {
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        border-bottom: 1px solid var(--border);
+        background: linear-gradient(135deg, rgba(8, 22, 0, 0.98) 0%, rgba(12, 35, 0, 0.97) 100%);
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.32);
+        backdrop-filter: blur(8px);
+    }
 
-            ul {
-                flex-flow: row nowrap;
-                width: calc(100% - 30px);
+    .navbar-container {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 60px;
+        padding: 0 1rem;
+        gap: 0.75rem;
+    }
 
-                li {
-                    width: 33vw;
-                    border-top: 4vh solid #144000;
-                    border-right: 30px solid #144000;
-                    border-bottom: 4vh solid #144000;
-                    border-left: 30px solid transparent;
-                    height: 0;
+    .navbar-brand {
+        font-size: 1rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+    }
 
-                    &:last-child::after {
-                        border-top: 4vh solid transparent;
-                        border-bottom: 4vh solid transparent;
-                        border-right: 0;
-                        top: 0;
-                    }
+    .home-link {
+        text-decoration: none;
+        color: var(--text);
+    }
 
-                    &:last-child:hover {
-                        &&::after {
-                            border-right: 0;
-                        }
-                    }
+    .logo {
+        color: var(--accent-light);
+    }
 
-                    &::after {
-                        transform: translate(100%, -50%);
-                        border-top: 4vh solid transparent;
-                        border-right: 30px solid transparent;
-                        border-bottom: 4vh solid transparent;
-                        border-left: 30px solid #144000;
-                        height: 0;
-                        right: -28px;
-                        top: 0;
-                    }
+    .navbar-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-left: auto;
+    }
 
-                    &:hover {
-                        border-top: 4vh solid #ffff00;
-                        border-right: 30px solid #ffff00;
-                        border-bottom: 4vh solid #ffff00;
-                        border-left: 30px solid transparent;
+    :host(.theme-dark) {
+        --bg: #071400;
+        --bg-panel: rgba(0, 30, 0, 0.85);
+        --border: rgba(180, 150, 30, 0.55);
+        --border-bright: rgba(212, 175, 55, 0.75);
+        --accent: #d4af37;
+        --accent-light: #f0d060;
+        --text: #f5e9b0;
+        --text-muted: #cce89a;
+        --text-faint: #7aaa50;
+    }
 
-                        &::after {
-                            border-top: 4vh solid transparent;
-                            border-right: 30px solid transparent;
-                            border-bottom: 4vh solid transparent;
-                            border-left: 30px solid #ffff00;
-                            top: 0;
-                        }
-                    }
+    :host(.theme-light) {
+        --bg: #f7f3e8;
+        --bg-panel: rgba(255, 255, 255, 0.92);
+        --border: rgba(73, 96, 64, 0.2);
+        --border-bright: rgba(79, 125, 88, 0.35);
+        --accent: #4f7d58;
+        --accent-light: #2f5b3c;
+        --text: #17301d;
+        --text-muted: #385443;
+        --text-faint: #6a7f6c;
+    }
 
-                    &.active {
-                        border-top: 4vh solid #ffd700;
-                        border-right: 30px solid #ffd700;
-                        border-bottom: 4vh solid #ffd700;
-                        border-left: 30px solid transparent;
+    .navbar {
+        background: linear-gradient(135deg, var(--bg-panel) 0%, var(--bg) 100%);
+        color: var(--text);
+    }
 
-                        &::after {
-                            border-left: 30px solid #ffd700;
-                            border-top: 4vh solid transparent;
-                        }
+    .nav-menu {
+        position: fixed;
+        inset: 60px 0 auto 0;
+        background: var(--bg-panel);
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+        transform: translateX(-100%);
+        transition: transform 0.25s ease;
+        backdrop-filter: blur(8px);
+        z-index: 99;
+    }
 
-                        &:hover {
-                            border-top: 4vh solid #ffff00;
-                            border-right: 30px solid #ffff00;
-                            border-bottom: 4vh solid #ffff00;
-                            border-left: 30px solid transparent;
+    .nav-menu.open {
+        transform: translateX(0);
+    }
 
-                            &::after {
-                                border-left: 30px solid #ffff00;
-                                border-top: 4vh solid transparent;
-                            }
-                        }
-                    }
+    .nav-menu ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+    }
 
-                    a {
-                        top: 0;
-                        align-self: center;
-                        position: relative;
-                    }
-                }
-            }
+    .nav-menu li + li {
+        border-top: 1px solid rgba(212, 175, 55, 0.16);
+    }
+
+    .nav-link {
+        display: block;
+        padding: 0.95rem 1rem;
+        color: var(--text-muted);
+        text-decoration: none;
+        transition: background 0.2s ease, color 0.2s ease;
+    }
+
+    .nav-link:hover,
+    .nav-link.active {
+        background: rgba(212, 175, 55, 0.1);
+        color: var(--accent-light);
+    }
+
+    .main-content {
+        width: 100%;
+        margin: 0 auto;
+    }
+
+    @media (min-width: 769px) {
+        .navbar-container {
+            height: 70px;
+            padding: 0 1.5rem;
+        }
+
+        .nav-menu {
+            position: static;
+            display: flex;
+            align-items: center;
+            background: transparent;
+            border: 0;
+            transform: none;
+            backdrop-filter: none;
+        }
+
+        .nav-menu ul {
+            display: flex;
+            gap: 0.35rem;
+        }
+
+        .nav-menu li + li {
+            border-top: 0;
+        }
+
+        .nav-link {
+            padding: 0.6rem 0.9rem;
+            border-radius: 999px;
+            border: 1px solid transparent;
+        }
+
+        .nav-link.active {
+            border-color: var(--border-bright);
         }
     }
 </style>

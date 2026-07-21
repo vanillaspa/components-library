@@ -1,0 +1,121 @@
+<template>
+    <div class="publisher">
+        <h2>Publisher</h2>
+        <div class="input-group">
+            <input type="text" class="message-input" placeholder="Enter a message" />
+            <button class="send-btn">Send</button>
+        </div>
+        <div class="stats">
+            <p>Messages published: <span class="count">0</span></p>
+        </div>
+    </div>
+</template>
+
+<script>
+    let messageCount = 0;
+
+    const input = shadowDocument.querySelector('.message-input');
+    const button = shadowDocument.querySelector('.send-btn');
+    const countSpan = shadowDocument.querySelector('.count');
+
+    const sendMessage = () => {
+        const text = input.value.trim();
+        if (!text) return;
+
+        // Dispatch event to the event bus
+        const event = new CustomEvent('app:message', {
+            detail: {
+                text,
+                timestamp: Date.now(),
+                target: this
+            }
+        });
+
+        eventbus.dispatchEvent(event);
+
+        messageCount++;
+        countSpan.textContent = messageCount;
+        input.value = '';
+        input.focus();
+    };
+
+    button.addEventListener('click', sendMessage);
+    input.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') sendMessage();
+    });
+</script>
+
+<style>
+    :host {
+        display: block;
+        padding: 20px;
+        border: 2px solid #3b82f6;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%);
+    }
+
+    .publisher h2 {
+        margin: 0 0 16px 0;
+        font-size: 18px;
+        color: #1e40af;
+    }
+
+    .input-group {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 16px;
+    }
+
+    .message-input {
+        flex: 1;
+        padding: 10px 12px;
+        border: 1px solid #93c5fd;
+        border-radius: 6px;
+        font-size: 14px;
+        font-family: inherit;
+    }
+
+    .message-input:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    .send-btn {
+        padding: 10px 20px;
+        background-color: #3b82f6;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+
+    .send-btn:hover {
+        background-color: #2563eb;
+    }
+
+    .send-btn:active {
+        transform: scale(0.98);
+    }
+
+    .stats {
+        padding: 12px;
+        background-color: rgba(255, 255, 255, 0.8);
+        border-radius: 6px;
+        border-left: 4px solid #3b82f6;
+    }
+
+    .stats p {
+        margin: 0;
+        color: #1e40af;
+        font-weight: 600;
+        font-size: 14px;
+    }
+
+    .stats span {
+        color: #3b82f6;
+        font-size: 16px;
+    }
+</style>

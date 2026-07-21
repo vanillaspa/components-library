@@ -1,0 +1,35 @@
+<template>
+    <div>
+        <span>This website uses OPFS. CHECK YOUR BROWSER! If you want to delete go to <a href="/opfs">/opfs</a></span>
+        <span id="close">X</span>
+    </div>
+</template>
+<style>
+    :host {
+        background-color: aliceblue;
+        bottom: 0;
+        display: flex;
+        flex-flow: column nowrap;
+        justify-content: center;
+        padding: 8px 16px;
+        position: sticky;
+    }
+
+    div {
+        display: flex;
+        flex-flow: row nowrap;
+        height: auto;
+        justify-content: space-between;
+    }
+
+    #close {
+        cursor: pointer;
+    }
+</style>
+
+<script>
+    const close = shadowDocument.querySelector("#close");
+    close.addEventListener("click", function () {
+        shadowDocument.host.remove();
+    })
+</script>

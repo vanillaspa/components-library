@@ -1,0 +1,173 @@
+<template>
+    <div class="subscriber">
+        <h2>Subscriber</h2>
+        <div class="log-container">
+            <div class="log-header">
+                <span>Received Messages</span>
+                <button class="clear-btn">Clear</button>
+            </div>
+            <div class="messages"></div>
+        </div>
+        <div class="stats">
+            <p>Messages received: <span class="count">0</span></p>
+        </div>
+    </div>
+</template>
+
+<script>
+    let messageCount = 0;
+    let unsubscribe;
+
+    const messagesContainer = shadowDocument.querySelector('.messages');
+    const countSpan = shadowDocument.querySelector('.count');
+    const clearBtn = shadowDocument.querySelector('.clear-btn');
+
+    // Subscribe to 'app:message' events
+    const handler = (event) => {
+        messageCount++;
+        countSpan.textContent = messageCount;
+
+        const messageEl = document.createElement('div');
+        messageEl.className = 'message-item';
+        const time = new Date(event.detail.timestamp).toLocaleTimeString();
+        messageEl.innerHTML = `<span class="time">${time}</span><span class="text">${escapeHtml(event.detail.text)}</span>`;
+
+        messagesContainer.insertBefore(messageEl, messagesContainer.firstChild);
+
+        // Keep only last 10 messages
+        while (messagesContainer.children.length > 10) {
+            messagesContainer.removeChild(messagesContainer.lastChild);
+        }
+    };
+
+    eventbus.addEventListener('app:message', handler, shadowDocument.host);
+
+    clearBtn.addEventListener('click', () => {
+        messagesContainer.innerHTML = '';
+        messageCount = 0;
+        countSpan.textContent = messageCount;
+    });
+
+    function escapeHtml(text) {
+        const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+        return text.replace(/[&<>"']/g, m => map[m]);
+    }
+</script>
+
+<style>
+    :host {
+        display: block;
+        padding: 20px;
+        border: 2px solid #10b981;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #dcfce7 0%, #f0fdf4 100%);
+    }
+
+    .subscriber h2 {
+        margin: 0 0 16px 0;
+        font-size: 18px;
+        color: #166534;
+    }
+
+    .log-container {
+        background-color: white;
+        border: 1px solid #bbf7d0;
+        border-radius: 6px;
+        overflow: hidden;
+        margin-bottom: 16px;
+    }
+
+    .log-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 16px;
+        background-color: #f0fdf4;
+        border-bottom: 1px solid #bbf7d0;
+        font-weight: 600;
+        color: #166534;
+        font-size: 14px;
+    }
+
+    .clear-btn {
+        padding: 6px 12px;
+        background-color: #ef4444;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+
+    .clear-btn:hover {
+        background-color: #dc2626;
+    }
+
+    .messages {
+        max-height: 250px;
+        overflow-y: auto;
+    }
+
+    .message-item {
+        display: flex;
+        gap: 10px;
+        padding: 10px 16px;
+        border-bottom: 1px solid #e0e7ff;
+        font-size: 13px;
+    }
+
+    .message-item:last-child {
+        border-bottom: none;
+    }
+
+    .message-item .time {
+        color: #6b7280;
+        font-weight: 600;
+        flex-shrink: 0;
+        min-width: 80px;
+        font-size: 12px;
+    }
+
+    .message-item .text {
+        color: #374151;
+        word-break: break-word;
+    }
+
+    .stats {
+        padding: 12px;
+        background-color: rgba(255, 255, 255, 0.8);
+        border-radius: 6px;
+        border-left: 4px solid #10b981;
+    }
+
+    .stats p {
+        margin: 0;
+        color: #166534;
+        font-weight: 600;
+        font-size: 14px;
+    }
+
+    .stats span {
+        color: #10b981;
+        font-size: 16px;
+    }
+
+    .messages::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .messages::-webkit-scrollbar-track {
+        background: #f3f4f6;
+    }
+
+    .messages::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 3px;
+    }
+
+    .messages::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+    }
+</style>

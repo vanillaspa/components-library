@@ -1,0 +1,526 @@
+<script>
+  const { GraphQLSchema, GraphQLObjectType, GraphQLList, GraphQLNonNull,
+          GraphQLString, GraphQLInt, GraphQLFloat, GraphQLBoolean, graphql }
+    = graphqlmod;
+
+  const { createDB, executeQuery, executeStatement, getWorkers } = sqlite;
+
+  // ── Type mapping ───────────────────────────────────────────────────────────
+  const toScalar = (t = '') => {
+    t = t.toUpperCase();
+    if (t.includes('INT'))                                            return GraphQLInt;
+    if (t.includes('REAL')||t.includes('FLOAT')||t.includes('NUM'))  return GraphQLFloat;
+    if (t.includes('BOOL'))                                           return GraphQLBoolean;
+    return GraphQLString;
+  };
+
+  const getTables = async db => {
+    const rows = await executeQuery(
+      `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name`,
+      db
+    );
+    return rows.map(r => r[0]);
+  };
+
+  const getCols = async (table, db) => {
+    const rows = await executeQuery(`PRAGMA table_info(${JSON.stringify(table)})`, db);
+    return rows.map(r => ({ cid:r[0], name:r[1], type:r[2], notnull:r[3], dflt_value:r[4], pk:r[5] }));
+  };
+
+  // ── Schema builder — merges ALL open workers into one schema ───────────────
+  // Table names are prefixed with db name to avoid collisions:
+  // db "analytics", table "events" → GraphQL type "AnalyticsEvents", field "analytics_events"
+  const buildMergedSchema = async () => {
+    const workers = getWorkers(); // Map<dbName, Worker>
+    if (!workers.size) return new GraphQLSchema({
+      query: new GraphQLObjectType({
+        name: 'Query',
+        fields: { _hint: { type: GraphQLString, resolve: () => 'No databases open.' } }
+      })
+    });
+
+    const qFields = {};
+    const mFields = {};
+
+    for (const dbName of workers.keys()) {
+      const tables = await getTables(dbName);
+
+      // rawSQL per db: rawSQL_mydb(sql: "...")
+      qFields[`rawSQL_${dbName}`] = {
+        type: GraphQLString,
+        description: `Run raw SQL against "${dbName}"`,
+        args: { sql: { type: new GraphQLNonNull(GraphQLString) } },
+        resolve: (_, { sql }) =>
+          executeQuery(sql, dbName)
+            .then(r => JSON.stringify(r, null, 2))
+            .catch(e => JSON.stringify({ error: e.message }))
+      };
+
+      for (const t of tables) {
+        const cols  = await getCols(t, dbName);
+        const pk    = cols.find(c => c.pk) || cols[0];
+
+        // Unique GraphQL type name: "AnalyticsEvents"
+        const typeName  = dbName[0].toUpperCase() + dbName.slice(1) + '_' + t[0].toUpperCase() + t.slice(1);
+        // Field name: "analytics_events"
+        const fieldName = `${dbName}_${t}`;
+        const tq        = JSON.stringify(t);
+
+        const T = new GraphQLObjectType({
+          name: typeName,
+          description: `Table "${t}" from database "${dbName}"`,
+          fields: Object.fromEntries(cols.map(c => [
+            c.name, {
+              type: c.notnull ? new GraphQLNonNull(toScalar(c.type)) : toScalar(c.type),
+              description: c.pk ? '🔑 Primary Key' : (c.type || 'TEXT')
+            }
+          ]))
+        });
+
+        // list
+        qFields[fieldName] = {
+          type: new GraphQLList(T),
+          description: `List rows from "${t}" in "${dbName}"`,
+          args: {
+            limit:   { type: GraphQLInt,    defaultValue: 100 },
+            offset:  { type: GraphQLInt,    defaultValue: 0 },
+            where:   { type: GraphQLString, description: 'SQL WHERE clause (without WHERE keyword)' },
+            orderBy: { type: GraphQLString, description: 'Column to order by' },
+            order:   { type: GraphQLString, defaultValue: 'ASC', description: 'ASC or DESC' }
+          },
+          resolve: (_, { limit, offset, where, orderBy, order }) => {
+            let sql = `SELECT * FROM ${tq}`;
+            if (where)   sql += ` WHERE ${where}`;
+            if (orderBy) sql += ` ORDER BY ${JSON.stringify(orderBy)} ${order === 'DESC' ? 'DESC' : 'ASC'}`;
+            sql += ` LIMIT $1 OFFSET $2`;
+            return executeStatement(sql, [limit, offset], dbName);
+          }
+        };
+
+        // single by pk
+        if (pk) {
+          const singleName = `${dbName}_${t.endsWith('s') ? t.slice(0, -1) : t + 'ById'}`;
+          qFields[singleName] = {
+            type: T,
+            args: { [pk.name]: { type: new GraphQLNonNull(toScalar(pk.type)) } },
+            resolve: (_, args) =>
+              executeStatement(
+                `SELECT * FROM ${tq} WHERE ${JSON.stringify(pk.name)} = $1 LIMIT 1`,
+                [args[pk.name]], dbName
+              ).then(r => r[0] || null)
+          };
+        }
+
+        // insert
+        const MutName = typeName;
+        mFields[`insert_${fieldName}`] = {
+          type: T,
+          description: `Insert into "${t}" in "${dbName}"`,
+          args: Object.fromEntries(cols.filter(c => !c.pk).map(c => [
+            c.name, { type: c.notnull ? new GraphQLNonNull(toScalar(c.type)) : toScalar(c.type) }
+          ])),
+          resolve: (_, args) => {
+            const keys = Object.keys(args);
+            const ph   = keys.map((_, i) => `$${i + 1}`).join(', ');
+            const sql  = `INSERT INTO ${tq} (${keys.map(k => JSON.stringify(k)).join(', ')}) VALUES (${ph}) RETURNING *`;
+            return executeStatement(sql, Object.values(args), dbName).then(r => r[0] || null);
+          }
+        };
+
+        // delete
+        if (pk) {
+          const delFieldName = `delete_${dbName}_${t.endsWith('s') ? t.slice(0,-1) : t}`;
+          mFields[delFieldName] = {
+            type: GraphQLBoolean,
+            description: `Delete from "${t}" in "${dbName}"`,
+            args: { [pk.name]: { type: new GraphQLNonNull(toScalar(pk.type)) } },
+            resolve: (_, args) =>
+              executeStatement(
+                `DELETE FROM ${tq} WHERE ${JSON.stringify(pk.name)} = $1`,
+                [args[pk.name]], dbName
+              ).then(() => true)
+          };
+        }
+      }
+    }
+
+    // Always have at least one query field
+    if (!Object.keys(qFields).length) {
+      qFields['_hint'] = { type: GraphQLString, resolve: () => 'No tables found in any open database.' };
+    }
+
+    return new GraphQLSchema({
+      query: new GraphQLObjectType({ name: 'Query', fields: qFields }),
+      ...(Object.keys(mFields).length && {
+        mutation: new GraphQLObjectType({ name: 'Mutation', fields: mFields })
+      })
+    });
+  };
+
+  // ── Seed demo data ─────────────────────────────────────────────────────────
+  const seedIfEmpty = async db => {
+    if ((await getTables(db)).length) return;
+    if (db === 'graphiql' || db === 'main') {
+      await executeQuery(`CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, age INTEGER, created_at TEXT DEFAULT CURRENT_TIMESTAMP)`, db);
+      await executeQuery(`CREATE TABLE IF NOT EXISTS posts (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, title TEXT NOT NULL, content TEXT, views INTEGER DEFAULT 0, created_at TEXT DEFAULT CURRENT_TIMESTAMP)`, db);
+      await executeQuery(`INSERT OR IGNORE INTO users (id,name,email,age) VALUES (1,'Alice','alice@example.com',28),(2,'Bob','bob@example.com',35),(3,'Charlie','charlie@example.com',42)`, db);
+      await executeQuery(`INSERT OR IGNORE INTO posts (id,user_id,title,content,views) VALUES (1,1,'Hello GraphQL','Intro post',1200),(2,2,'SQLite im Browser','WASM rocks',2043),(3,1,'Web Components','Reusable UI',856)`, db);
+    } else {
+      // Generic seed for additional DBs
+      await executeQuery(`CREATE TABLE IF NOT EXISTS entries (id INTEGER PRIMARY KEY AUTOINCREMENT, label TEXT NOT NULL, value REAL, created_at TEXT DEFAULT CURRENT_TIMESTAMP)`, db);
+      await executeQuery(`INSERT OR IGNORE INTO entries (id,label,value) VALUES (1,'alpha',1.5),(2,'beta',2.7),(3,'gamma',0.9)`, db);
+    }
+  };
+
+  // ── DOM refs ───────────────────────────────────────────────────────────────
+  const dbInput    = shadowDocument.querySelector('.db-input');
+  const openBtn    = shadowDocument.querySelector('.open-btn');
+  const textarea   = shadowDocument.querySelector('textarea');
+  const runBtn     = shadowDocument.querySelector('.run-btn');
+  const output     = shadowDocument.querySelector('.output');
+  const schemaEl   = shadowDocument.querySelector('.schema-explorer');
+  const workersEl  = shadowDocument.querySelector('.workers-list');
+
+  let gqlSchema = null;
+
+  // ── Render sidebar: worker pills + schema tree ─────────────────────────────
+  const renderSidebar = async () => {
+    const workers = getWorkers();
+
+    // Worker pills
+    workersEl.innerHTML = [...workers.keys()].map(db =>
+      `<span class="db-pill">${db}</span>`
+    ).join('') || '<span class="no-workers">none</span>';
+
+    // Schema tree grouped by db
+    let html = '';
+    for (const db of workers.keys()) {
+      const tables = await getTables(db);
+      const tableItems = await Promise.all(tables.map(async t => {
+        const cols = await getCols(t, db);
+        const fields = cols.map(c =>
+          `<span class="field">${c.pk ? '🔑' : '◦'} ${c.name}: <em>${c.type || 'TEXT'}</em></span>`
+        ).join('');
+        return `<div class="type-block">
+          <strong>${db}_${t}</strong>
+          ${fields}
+        </div>`;
+      }));
+      html += `<div class="db-group">
+        <div class="db-group-label">${db}</div>
+        ${tableItems.join('') || '<span class="field muted">no tables</span>'}
+      </div>`;
+    }
+    schemaEl.innerHTML = html || '<em class="muted">No databases open</em>';
+  };
+
+  // ── Open a DB worker ───────────────────────────────────────────────────────
+  const openDB = async () => {
+    const db = dbInput.value.trim();
+    if (!db) return;
+    try {
+      await createDB(db);
+      await seedIfEmpty(db);
+      gqlSchema = await buildMergedSchema();
+      await renderSidebar();
+      dbInput.value = '';
+      dbInput.placeholder = `e.g. analytics`;
+    } catch (e) {
+      output.textContent = `❌ Error opening "${db}": ${e.message}`;
+    }
+  };
+
+  // ── Execute GraphQL ────────────────────────────────────────────────────────
+  const runQuery = async () => {
+    if (!gqlSchema) { output.textContent = 'No schema — open a database first.'; return; }
+    const src = textarea.value.trim();
+    if (!src) { output.textContent = 'Enter a GraphQL query.'; return; }
+    output.textContent = 'Executing…';
+    try {
+      const result = await graphql({ schema: gqlSchema, source: src });
+      output.textContent = JSON.stringify(result, null, 2);
+    } catch (e) {
+      output.textContent = `Error: ${e.message}`;
+    }
+  };
+
+  openBtn.addEventListener('click', openDB);
+  runBtn.addEventListener('click', runQuery);
+  textarea.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') runQuery();
+  });
+  dbInput.addEventListener('keydown', e => { if (e.key === 'Enter') openDB(); });
+
+  // Open default DB on mount
+  dbInput.value = 'graphiql';
+  await openDB();
+</script>
+
+<style>
+  :host {
+    display: flex;
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #f4f5f7;
+    color: #1a1a2e;
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: 230px;
+    flex-shrink: 0;
+    background: #1a1a2e;
+    color: #c8d0e0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .sidebar-header {
+    padding: 14px 16px;
+    border-bottom: 1px solid #2a2a4a;
+  }
+
+  .logo {
+    font-size: .9rem;
+    font-weight: 700;
+    color: #e8ff5a;
+    letter-spacing: .04em;
+  }
+  .logo span { color: #5af0ff; }
+
+  .db-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 10px;
+  }
+
+  .db-input {
+    flex: 1;
+    min-width: 0;
+    font-size: .75rem;
+    background: #0d0f1e;
+    border: 1px solid #2a2a4a;
+    border-radius: 4px;
+    color: #e2e8f8;
+    padding: 4px 8px;
+    outline: none;
+  }
+  .db-input:focus { border-color: #e8ff5a; }
+
+  .open-btn {
+    font-size: .7rem;
+    font-weight: 700;
+    background: #e8ff5a;
+    color: #1a1a2e;
+    border: none;
+    border-radius: 4px;
+    padding: 4px 8px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .open-btn:hover { opacity: .85; }
+
+  /* ── Worker pills ── */
+  .section-label {
+    font-size: .62rem;
+    font-weight: 700;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: #5a6278;
+    padding: 12px 16px 6px;
+  }
+
+  .workers-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    padding: 0 16px 12px;
+    border-bottom: 1px solid #2a2a4a;
+  }
+
+  .db-pill {
+    font-size: .68rem;
+    font-weight: 600;
+    background: #2a2a4a;
+    color: #5af0ff;
+    border-radius: 99px;
+    padding: 2px 9px;
+  }
+
+  .no-workers {
+    font-size: .72rem;
+    color: #3a3a5a;
+    font-style: italic;
+  }
+
+  /* ── Schema explorer ── */
+  .schema-explorer {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 16px 16px;
+    font-size: .73rem;
+  }
+
+  .db-group {
+    margin-top: 12px;
+  }
+
+  .db-group-label {
+    font-size: .62rem;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: #5a6278;
+    margin-bottom: 6px;
+  }
+
+  .type-block {
+    margin-bottom: 10px;
+  }
+  .type-block strong {
+    display: block;
+    color: #e8ff5a;
+    margin-bottom: 3px;
+    font-size: .72rem;
+  }
+  .field {
+    display: block;
+    padding-left: 8px;
+    color: #8892aa;
+    line-height: 1.65;
+  }
+  .field em { color: #5af0ff; font-style: normal; }
+  .muted { color: #3a3a5a; font-style: italic; }
+
+  /* ── Main ── */
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: #fff;
+    border-bottom: 1px solid #e0e0e0;
+    flex-shrink: 0;
+  }
+
+  .top-bar h2 {
+    font-size: .95rem;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin: 0;
+  }
+
+  .hint {
+    font-size: .72rem;
+    color: #888;
+    margin: 0;
+  }
+  .hint code {
+    background: #f0f0f0;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-family: monospace;
+  }
+  .hint kbd {
+    background: #f0f0f0;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-family: monospace;
+    font-size: .85em;
+  }
+
+  .editor-area {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+    padding: 16px;
+    gap: 10px;
+  }
+
+  textarea {
+    flex: 1;
+    padding: 12px;
+    border: 1px solid #d0d0d0;
+    border-radius: 6px;
+    font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+    font-size: .85rem;
+    resize: none;
+    background: #fafafa;
+    color: #1a1a2e;
+    outline: none;
+    transition: border-color .15s;
+  }
+  textarea:focus { border-color: #0066cc; background: #fff; }
+
+  .run-btn {
+    align-self: flex-start;
+    padding: 8px 20px;
+    background: #0066cc;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    font-weight: 700;
+    font-size: .85rem;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .run-btn:hover  { background: #0052a3; }
+  .run-btn:active { background: #004085; }
+
+  .output {
+    flex: 1;
+    padding: 12px;
+    background: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+    font-size: .8rem;
+    line-height: 1.5;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    color: #333;
+    min-height: 80px;
+  }
+</style>
+
+<template>
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">⬡ <span>GraphQL</span> ↔ SQLite</div>
+      <div class="db-row">
+        <input class="db-input" type="text" placeholder="db name + Enter" />
+        <button class="open-btn">Open</button>
+      </div>
+    </div>
+    <div class="section-label">Open workers</div>
+    <div class="workers-list"></div>
+    <div class="section-label">Schema</div>
+    <div class="schema-explorer"></div>
+  </div>
+
+  <div class="main">
+    <div class="top-bar">
+      <h2>GraphQL Explorer</h2>
+      <p class="hint">
+        <kbd>Ctrl+Enter</kbd> to run &nbsp;·&nbsp;
+        fields are prefixed: <code>dbname_tablename</code>
+      </p>
+    </div>
+    <div class="editor-area">
+      <textarea spellcheck="false">{ graphiql_users { id name email age } }</textarea>
+      <button class="run-btn">▶ Execute</button>
+      <div role="region" aria-live="polite" class="output">Result appears here…</div>
+    </div>
+  </div>
+</template>
