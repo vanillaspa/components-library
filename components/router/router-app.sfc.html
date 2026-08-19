@@ -11,8 +11,10 @@
             <nav class="nav-menu">
                 <ul>
                     <li><a href="/about" class="nav-link">About</a></li>
-                    <li><a href="/persistence" class="nav-link">Persistence</a></li>
-                    <li><a href="/dragndrop" class="nav-link">Drag & Drop</a></li>
+                    <li><a href="/chat" class="nav-link">Chat</a></li>
+                    <li><a href="/dragndrop" class="nav-link">Drag'n Drop Demo</a></li>
+                    <li><a href="/hero" class="nav-link">Hero Quest</a></li>
+                    <li><a href="/persistence" class="nav-link">SQLite/GraphQL</a></li>
                 </ul>
             </nav>
         </div>
@@ -32,9 +34,11 @@
     let _sitemap = [
         { "title": "Home", "template": "home-page" },
         {
-            "about": { "title": "About", "template": "about-me" },
-            "persistence": { "title": "Persistence", "template": "sqlite-workers" },
-            "dragndrop": { "title": "DragnDrop", "template": "dragndrop-container" },
+            "/about": { "title": "About", "template": "about-me" },
+            "/chat": { "title": "Chat", "template": "webrtc-dsgvo2" },
+            "/dragndrop": { "title": "Drag'nDrop", "template": "dragndrop-container" },
+            "/hero": { "title": "Hero Quest", "template": "hero-quest" },
+            "/persistence": { "title": "SQLite/GraphQL", "template": "sqlite-workers" },
         }
     ];
 
@@ -153,7 +157,7 @@
         link(e.detail.pathname);
     }
     function link(pathname) {
-        console.log({pathname});
+        console.log({ pathname });
         let mapping = getMapping(pathname);
         console.log({ mapping });
         history.pushState(mapping.template, mapping.title, pathname);
@@ -276,7 +280,7 @@
         padding: 0;
     }
 
-    .nav-menu li + li {
+    .nav-menu li+li {
         border-top: 1px solid rgba(212, 175, 55, 0.16);
     }
 
@@ -320,7 +324,7 @@
             gap: 0.35rem;
         }
 
-        .nav-menu li + li {
+        .nav-menu li+li {
             border-top: 0;
         }
 
