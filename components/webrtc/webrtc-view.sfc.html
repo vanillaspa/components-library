@@ -1,7 +1,4 @@
 <script>
-    const { log, error } = await import('./modules/Logger.js');
-    const { WebRTC } = await import('./services/WebRTC.js');
-
     function initializeWithOffer() {
         WebRTC.initializeWithOffer();
     }
@@ -18,12 +15,10 @@
         WebRTC.sendToRemote(text);
     }
 
-    return {
-        initializeWithOffer,
-        initializeWithAnswer,
-        setSDP,
-        sendToRemote
-    };
+    shadowDocument.querySelector("#initializeWithOffer").addEventListener("click", initializeWithOffer);
+    shadowDocument.querySelector("#initializeWithAnswer").addEventListener("click", initializeWithAnswer);
+    shadowDocument.querySelector("#setSDP").addEventListener("click", setSDP);
+    shadowDocument.querySelector("#sendToRemote").addEventListener("click", sendToRemote);
 </script>
 
 <style></style>
@@ -37,8 +32,8 @@
         <li>You can now Send messages to remote. Please make sure, they are valid JSON.</li>
     </ol>
     <textarea id="app"></textarea>
-    <button id="initializeWithOffer" onclick="this.script.initializeWithOffer()">Step 1 on A: Create offer</button>
-    <button id="initializeWithAnswer" onclick="this.script.initializeWithAnswer()">Step 2 on B: Create answer</button>
-    <button id="setSDP" onclick="this.script.setSDP()">Step 3 on A: Set remote</button>
-    <button id="sendToRemote" onclick="this.script.sendToRemote()">Send to Remote</button>
+    <button id="initializeWithOffer">Step 1 on A: Create offer</button>
+    <button id="initializeWithAnswer">Step 2 on B: Create answer</button>
+    <button id="setSDP">Step 3 on A: Set remote</button>
+    <button id="sendToRemote">Send to Remote</button>
 </template>
