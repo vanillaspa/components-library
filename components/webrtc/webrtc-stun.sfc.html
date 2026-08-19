@@ -1,42 +1,214 @@
 <script>
+    var peerConnection = null;
+    var dataChannel = null;
+    var iceServers = [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+    ];
+    var statsTimer = null;
+
+    export function setIceServers(serverList) {
+        iceServers = serverList;
+        console.log('Updated STUN/TURN servers configuration:', iceServers);
+    }
+
+    function updateUIOutput(data) {
+        console.log({ data })
+        const textarea = shadowDocument.getElementById('app');
+        if (textarea) {
+            textarea.value = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+        }
+    }
+
+    function createPeerConnection() {
+        console.log('Creating RTCPeerConnection with STUN servers:', iceServers);
+        peerConnection = new RTCPeerConnection({ iceServers: iceServers });
+
+        peerConnection.oniceconnectionstatechange = () => {
+            const state = peerConnection.iceConnectionState;
+            console.log(`ICE Connection State: ${state}`);
+            updateConnectionBadge(state);
+
+            if (state === 'connected' || state === 'completed') {
+                startStatsMonitoring();
+            } else if (state === 'disconnected' || state === 'failed' || state === 'closed') {
+                stopStatsMonitoring();
+            }
+        };
+
+        peerConnection.onicecandidateerror = (event) => {
+            console.error(`STUN/ICE Candidate Error on ${event.url}:`, event.errorText || event.errorCode);
+        };
+
+        peerConnection.ondatachannel = (event) => {
+            console.log('Received remote Data Channel');
+            dataChannel = event.channel;
+            setupDataChannelEvents();
+        };
+    }
+
+    function updateConnectionBadge(state) {
+        const badge = shadowDocument.getElementById('connStateBadge');
+        if (badge) {
+            badge.textContent = state.toUpperCase();
+            badge.className = `status-badge status-${state}`;
+        }
+    }
+
+    function setupDataChannelEvents() {
+        if (!dataChannel) return;
+
+        dataChannel.onopen = () => console.log('Data Channel OPENED.');
+        dataChannel.onclose = () => console.log('Data Channel CLOSED.');
+        dataChannel.onerror = (err) => console.error('Data Channel Error:', err);
+        dataChannel.onmessage = (event) => {
+            console.log('Received message from Remote Peer:', event.data);
+            alert(`[Remote Message Received]:\n${event.data}`);
+        };
+    }
+
+    function waitForIceGathering() {
+        return new Promise((resolve) => {
+            if (peerConnection.iceGatheringState === 'complete') {
+                resolve();
+            } else {
+                const checkState = () => {
+                    if (peerConnection.iceGatheringState === 'complete') {
+                        peerConnection.removeEventListener('icegatheringstatechange', checkState);
+                        resolve();
+                    }
+                };
+                peerConnection.addEventListener('icegatheringstatechange', checkState);
+            }
+        });
+    }
+
+    function startStatsMonitoring() {
+        stopStatsMonitoring();
+        statsTimer = setInterval(async () => {
+            if (!peerConnection) return;
+            const stats = await peerConnection.getStats();
+            let selectedPair = null;
+
+            stats.forEach((report) => {
+                if (report.type === 'transport') {
+                    const pair = stats.get(report.selectedCandidatePairId);
+                    if (pair) selectedPair = pair;
+                }
+            });
+
+            if (selectedPair) {
+                const localCandidate = stats.get(selectedPair.localCandidateId);
+                const remoteCandidate = stats.get(selectedPair.remoteCandidateId);
+                const statsEl = shadowDocument.getElementById('connectionStats');
+                if (statsEl && localCandidate && remoteCandidate) {
+                    const rtt = selectedPair.currentRoundTripTime
+                        ? `${(selectedPair.currentRoundTripTime * 1000).toFixed(1)} ms`
+                        : 'N/A';
+                    statsEl.innerHTML = `
+            <div><strong>Local Endpoint:</strong> ${localCandidate.candidateType} (${localCandidate.ip}:${localCandidate.port}/${localCandidate.protocol})</div>
+            <div><strong>Remote Endpoint:</strong> ${remoteCandidate.candidateType} (${remoteCandidate.ip}:${remoteCandidate.port}/${remoteCandidate.protocol})</div>
+            <div><strong>Latency (RTT):</strong> ${rtt}</div>
+          `;
+                }
+            }
+        }, 1000);
+    }
+
+    function stopStatsMonitoring() {
+        if (statsTimer) {
+            clearInterval(statsTimer);
+            statsTimer = null;
+        }
+    }
+
+    function logMessage(msg) {
+        const logEl = shadowDocument.querySelector('#log-output');
+        if (logEl) {
+            logEl.textContent += `\n[${new Date().toLocaleTimeString()}] ${msg}`;
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+    }
+
+    function cleanup() {
+        stopStatsMonitoring();
+        if (peerConnection) {
+            peerConnection.close();
+            peerConnection = null;
+        }
+    }
+
+    async function initializeWithOffer() {
+        try {
+            console.log('Initializing Peer A with Offer...');
+            createPeerConnection();
+
+            dataChannel = peerConnection.createDataChannel('streamChannel');
+            setupDataChannelEvents();
+
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+
+            console.log('Gathering STUN/ICE candidates...');
+            await waitForIceGathering();
+
+            console.log(peerConnection.localDescription);
+        } catch (err) {
+            console.error('Failed to create Offer:', err);
+        }
+    }
+
+    export async function initializeWithAnswer() {
+        try {
+            const offerSDP = JSON.parse(shadowDocument.querySelector("#app").value);
+            console.log('Initializing Peer B with Answer...');
+            createPeerConnection();
+
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(offerSDP));
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
+
+            console.log('Gathering STUN/ICE candidates...');
+            await waitForIceGathering();
+
+            console.log(peerConnection.localDescription);
+        } catch (err) {
+            alert('Invalid JSON in textarea!');
+            console.error('Failed to create Answer:', err);
+        }
+    }
+
+    export async function setSDP() {
+        try {
+            const answerSDP = JSON.parse(shadowDocument.querySelector("#app").value);
+            console.log('Setting Remote Answer...');
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(answerSDP));
+        } catch (err) {
+            console.error('Failed to set Remote SDP:', err);
+        }
+    }
+
+    export function sendToRemote() {
+        try {
+            const message = JSON.parse(shadowDocument.querySelector("#app").value);
+            if (!dataChannel || dataChannel.readyState !== 'open') {
+                throw new Error('Data Channel is not open.');
+            }
+            const payload = typeof message === 'string' ? message : JSON.stringify(message);
+            dataChannel.send(payload);
+            console.log('Sent message:', payload);
+        } catch (err) {
+            console.error('Failed to send message:', err);
+        }
+    }
+
     function applyStunConfig() {
         const stunInput = shadowDocument.querySelector("#stunUrls").value.trim();
         const urls = stunInput.split("\n").map(u => u.trim()).filter(Boolean);
         const serverList = urls.map(url => ({ urls: url }));
 
-        Stun.setIceServers(serverList);
+        setIceServers(serverList);
         alert(`Applied ${serverList.length} STUN/TURN server(s).`);
-    }
-
-    function initializeWithOffer() {
-        Stun.initializeWithOffer();
-    }
-
-    function initializeWithAnswer() {
-        try {
-            const text = JSON.parse(shadowDocument.querySelector("#app").value);
-            Stun.initializeWithAnswer(text);
-        } catch (err) {
-            alert('Invalid JSON in textarea!');
-        }
-    }
-
-    function setSDP() {
-        try {
-            const text = JSON.parse(shadowDocument.querySelector("#app").value);
-            Stun.setSDP(text);
-        } catch (err) {
-            alert('Invalid JSON in textarea!');
-        }
-    }
-
-    function sendToRemote() {
-        try {
-            const text = JSON.parse(shadowDocument.querySelector("#app").value);
-            Stun.sendToRemote(text);
-        } catch (err) {
-            alert('Invalid JSON in textarea!');
-        }
     }
 
     shadowDocument.querySelector("#applyStunServers").addEventListener("click", applyStunConfig);

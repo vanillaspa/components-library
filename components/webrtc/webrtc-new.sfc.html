@@ -1,0 +1,196 @@
+<script>
+  var peerConnection = null;
+  var dataChannel = null;
+  var statsTimer = null;
+
+  // STUN servers configuration
+  const iceServers = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' }
+  ];
+
+  function initPeerConnection() {
+    // 1. Create Peer Connection with STUN
+    peerConnection = new RTCPeerConnection({ iceServers: iceServers });
+    // 2. Track Connection State
+    peerConnection.oniceconnectionstatechange = () => {
+      const state = peerConnection.iceConnectionState;
+      updateStateBadge(state);
+
+      if (state === 'connected' || state === 'completed') {
+        startStatsMonitoring();
+      } else {
+        stopStatsMonitoring();
+      }
+    };
+
+    dataChannel = peerConnection.createDataChannel('streamChannel');
+    setupDataChannel();
+  }
+
+  function setupDataChannel() {
+    if (!dataChannel) return;
+
+    dataChannel.onopen = () => logMessage('Data Channel OPENED.');
+    dataChannel.onmessage = (event) => {
+      logMessage(`Received: ${event.data}`);
+    };
+  }
+
+  function startStatsMonitoring() {
+    stopStatsMonitoring();
+    statsTimer = setInterval(async () => {
+      if (!peerConnection) return;
+      const stats = await peerConnection.getStats();
+      let selectedPair = null;
+
+      stats.forEach((report) => {
+        if (report.type === 'transport') {
+          const pair = stats.get(report.selectedCandidatePairId);
+          if (pair) selectedPair = pair;
+        }
+      });
+
+      if (selectedPair) {
+        const localCandidate = stats.get(selectedPair.localCandidateId);
+        const remoteCandidate = stats.get(selectedPair.remoteCandidateId);
+        const statsEl = shadowDocument.querySelector('#stats-output');
+        if (statsEl && localCandidate && remoteCandidate) {
+          const rtt = selectedPair.currentRoundTripTime
+            ? `${(selectedPair.currentRoundTripTime * 1000).toFixed(1)} ms`
+            : 'N/A';
+          statsEl.innerHTML = `
+            <div><strong>Local Endpoint:</strong> ${localCandidate.candidateType} (${localCandidate.ip}:${localCandidate.port}/${localCandidate.protocol})</div>
+            <div><strong>Remote Endpoint:</strong> ${remoteCandidate.candidateType} (${remoteCandidate.ip}:${remoteCandidate.port}/${remoteCandidate.protocol})</div>
+            <div><strong>Latency (RTT):</strong> ${rtt}</div>
+          `;
+        }
+      }
+    }, 1000);
+  }
+
+  function stopStatsMonitoring() {
+    if (statsTimer) {
+      clearInterval(statsTimer);
+      statsTimer = null;
+    }
+  }
+
+  function logMessage(msg) {
+    const logEl = shadowDocument.querySelector('#log-output');
+    if (logEl) {
+      logEl.textContent += `\n[${new Date().toLocaleTimeString()}] ${msg}`;
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+  }
+
+  function updateStateBadge(state) {
+    const badge = shadowDocument.querySelector('#state-badge');
+    if (badge) {
+      badge.textContent = state.toUpperCase();
+      badge.className = `badge status-${state}`;
+    }
+  }
+
+  function cleanup() {
+    stopStatsMonitoring();
+    if (peerConnection) {
+      peerConnection.close();
+      peerConnection = null;
+    }
+  }
+
+  export async function setSDP() {
+    try {
+      const answerSDP = JSON.parse(shadowDocument.querySelector("#app").value);
+      console.log('Setting Remote Answer...');
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(answerSDP));
+    } catch (err) {
+      console.error('Failed to set Remote SDP:', err);
+    }
+  }
+</script>
+
+<style>
+  :host {
+    display: block;
+    font-family: system-ui, -apple-system, sans-serif;
+    background: #18181b;
+    color: #f4f4f5;
+    border-radius: 8px;
+    padding: 16px;
+    max-width: 600px;
+    margin: 1rem auto;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  }
+
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #27272a;
+    padding-bottom: 10px;
+    margin-bottom: 12px;
+  }
+
+  .badge {
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background: #3f3f46;
+    color: #a1a1aa;
+  }
+
+  .state-connected,
+  .state-completed {
+    background: #166534;
+    color: #4ade80;
+  }
+
+  .state-checking {
+    background: #854d0e;
+    color: #fde047;
+  }
+
+  .state-failed,
+  .state-disconnected {
+    background: #991b1b;
+    color: #fca5a5;
+  }
+
+  .panel {
+    background: #09090b;
+    border: 1px solid #27272a;
+    border-radius: 6px;
+    padding: 12px;
+    font-family: monospace;
+    font-size: 0.85rem;
+    margin-bottom: 10px;
+  }
+
+  pre {
+    margin: 0;
+    white-space: pre-wrap;
+    max-height: 120px;
+    overflow-y: auto;
+    color: #a1a1aa;
+  }
+</style>
+
+<template>
+  <div>
+    <div class="header">
+      <strong>STUN Peer Connection</strong>
+      <span id="state-badge" class="badge">NEW</span>
+    </div>
+
+    <div class="panel" id="stats-output">
+      <em>Waiting for peer connection stats...</em>
+    </div>
+
+    <div class="panel">
+      <pre id="log-output">Initialized STUN configuration.</pre>
+    </div>
+  </div>
+</template>
