@@ -1,0 +1,44 @@
+<script>
+    const { log, error } = await import('./modules/Logger.js');
+    const { WebRTC } = await import('./services/WebRTC.js');
+
+    function initializeWithOffer() {
+        WebRTC.initializeWithOffer();
+    }
+    function initializeWithAnswer() {
+        const text = JSON.parse($("#app").value);
+        WebRTC.initializeWithAnswer(text);
+    }
+    function setSDP() {
+        const text = JSON.parse($("#app").value);
+        WebRTC.setSDP(text);
+    }
+    function sendToRemote() {
+        const text = JSON.parse($("#app").value);
+        WebRTC.sendToRemote(text);
+    }
+
+    return {
+        initializeWithOffer,
+        initializeWithAnswer,
+        setSDP,
+        sendToRemote
+    };
+</script>
+
+<style></style>
+
+<template>
+    <p>Please open this view in two tabs (A/B), and keep it open:</p>
+    <ol>
+        <li>Step 1 on A: Click "Create offer" and copy offer to clipboard.</li>
+        <li>Step 2 on B: Paste offer and click "Create answer". Copy answer to clipboard.</li>
+        <li>Steb 3 on A: Click "Set remote". The connection should now be established.</li>
+        <li>You can now Send messages to remote. Please make sure, they are valid JSON.</li>
+    </ol>
+    <textarea id="app"></textarea>
+    <button id="initializeWithOffer" onclick="this.script.initializeWithOffer()">Step 1 on A: Create offer</button>
+    <button id="initializeWithAnswer" onclick="this.script.initializeWithAnswer()">Step 2 on B: Create answer</button>
+    <button id="setSDP" onclick="this.script.setSDP()">Step 3 on A: Set remote</button>
+    <button id="sendToRemote" onclick="this.script.sendToRemote()">Send to Remote</button>
+</template>

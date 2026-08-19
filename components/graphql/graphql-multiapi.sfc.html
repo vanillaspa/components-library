@@ -8,9 +8,9 @@
   // ── Type mapping ───────────────────────────────────────────────────────────
   const toScalar = (t = '') => {
     t = t.toUpperCase();
-    if (t.includes('INT'))                                            return GraphQLInt;
-    if (t.includes('REAL')||t.includes('FLOAT')||t.includes('NUM'))  return GraphQLFloat;
-    if (t.includes('BOOL'))                                           return GraphQLBoolean;
+    if (t.includes('INT'))                                          return GraphQLInt;
+    if (t.includes('REAL')||t.includes('FLOAT')||t.includes('NUM')) return GraphQLFloat;
+    if (t.includes('BOOL'))                                         return GraphQLBoolean;
     return GraphQLString;
   };
 
