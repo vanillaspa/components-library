@@ -3,15 +3,15 @@
         WebRTC.initializeWithOffer();
     }
     function initializeWithAnswer() {
-        const text = JSON.parse($("#app").value);
+        const text = JSON.parse(shadowDocument.querySelector("#app").value);
         WebRTC.initializeWithAnswer(text);
     }
     function setSDP() {
-        const text = JSON.parse($("#app").value);
+        const text = JSON.parse(shadowDocument.querySelector("#app").value);
         WebRTC.setSDP(text);
     }
     function sendToRemote() {
-        const text = JSON.parse($("#app").value);
+        const text = JSON.parse(shadowDocument.querySelector("#app").value);
         WebRTC.sendToRemote(text);
     }
 
