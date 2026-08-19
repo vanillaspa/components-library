@@ -1,0 +1,71 @@
+<script>
+    const { insertAnimal, getAnimals, deleteAnimal } = window.Animals;
+
+    const animals = state;
+
+    if (animals) {
+        const ul = shadowDocument.querySelector("ul");
+        animals.forEach(row => {
+            const animalsLi = document.createElement("animals-li");
+            animalsLi.dataset.state = JSON.stringify(row);
+            ul.appendChild(animalsLi);
+        });
+    }
+
+    const animalform = shadowDocument.querySelector('#animalform');
+    animalform.addEventListener("submit", (e) => {
+        e.preventDefault(); // prevent default submit action
+        const animal = animalform.querySelector('#animal').value || "Dog";
+        const sound = animalform.querySelector('#sound').value || "Wuff!";
+        const icon = animalform.querySelector('#icon').value || "🐶";
+        const detail = { animal, sound, icon };
+        const insertionEvent = new CustomEvent('insertAnimal', { bubbles: true, composed: true, detail });
+        animalform.dispatchEvent(insertionEvent);
+    });
+
+    shadowDocument.host.addEventListener('insertAnimal', (e) => {
+        insertAnimal(e.detail)
+        const animals = getAnimals();
+        shadowDocument.host.dataset.state = JSON.stringify(animals);
+    });
+    shadowDocument.host.addEventListener('deleteAnimal', (e) => {
+        deleteAnimal(e.detail.id)
+        const animals = getAnimals();
+        shadowDocument.host.dataset.state = JSON.stringify(animals);
+    })
+</script>
+
+<style>
+    ul {
+        list-style-type: none;
+        white-space: pre-line;
+    }
+
+    form {
+        display: flex;
+    }
+
+    form span {
+        display: block;
+    }
+</style>
+
+<template>
+    <h2>Create an animal</h2>
+    <form action="#" id="animalform">
+        <span>
+            <label for="animal">Animal:</label><br />
+            <input type="text" id="animal" name="animal" />
+        </span>
+        <span>
+            <label for="sound">Sound:</label><br />
+            <input type="text" id="sound" name="sound" />
+        </span>
+        <span>
+            <label for="icon">Icon:</label><br />
+            <input type="text" id="icon" name="icon" />
+        </span>
+        <input type="submit" value="CREATE" />
+    </form>
+    <ul></ul>
+</template>

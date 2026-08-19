@@ -1,0 +1,189 @@
+<style>
+    :host {
+        background: #0a0a0a;
+        color: #00ffcc;
+        font-family: 'Fira Code', monospace;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    canvas {
+        border: 2px solid #333;
+        background: #000;
+        cursor: crosshair;
+        box-shadow: 0 0 20px rgba(0, 255, 204, 0.1);
+    }
+
+    .ui {
+        width: 800px;
+        padding: 20px;
+        background: #111;
+        border: 1px solid #333;
+        margin-top: 10px;
+        border-radius: 8px;
+    }
+
+    .stats {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        color: #888;
+        margin-bottom: 10px;
+    }
+
+    button {
+        background: #00ffcc;
+        color: #000;
+        border: none;
+        padding: 10px 20px;
+        font-weight: bold;
+        cursor: pointer;
+        border-radius: 4px;
+    }
+
+    button:hover {
+        background: #fff;
+    }
+
+    .log {
+        font-size: 10px;
+        color: #0f0;
+        height: 40px;
+        overflow-y: auto;
+        background: #050505;
+        padding: 5px;
+        border: 1px solid #222;
+    }
+</style>
+
+<template>
+    <title>P-NP Solver: Gabriel-Fixpoint Logic</title>
+    <h2>Gabriel-Skeletal Fixpoint Solver (P-Complexity)</h2>
+    <div class="ui">
+        <div class="stats">
+            <span>Nodes: <b id="count">0</b></span>
+            <span>Avg Complexity (m): <b id="m_val">0</b></span>
+            <span>Fixpoint Steps: <b id="steps">0</b></span>
+        </div>
+        <div class="log" id="console">System Ready. Add points to start analysis.</div>
+    </div>
+    <canvas id="canvas" width="800" height="450"></canvas>
+    <div style="margin: 20px;">
+        <button id="solve">Start P-Time Optimization</button>
+        <button id="reset" style="background:#444; color:#ccc;">Clear Canvas</button>
+    </div>
+</template>
+<script>
+    const canvas = shadowDocument.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    let nodes = [];
+    let tour = [];
+    let gabrielEdges = [];
+
+    canvas.onclick = (e) => {
+        const rect = canvas.getBoundingClientRect();
+        nodes.push({ x: e.clientX - rect.left, y: e.clientY - rect.top, id: nodes.length });
+        shadowDocument.getElementById('count').innerText = nodes.length;
+        if (nodes.length > 2) analyzeTopology();
+        render();
+    };
+
+    function analyzeTopology() {
+        gabrielEdges = [];
+        let mSum = 0;
+        for (let i = 0; i < nodes.length; i++) {
+            let m_i = 0;
+            for (let j = 0; j < nodes.length; j++) {
+                if (i === j) continue;
+                if (isGabriel(i, j)) {
+                    gabrielEdges.push([i, j]);
+                    m_i++;
+                }
+            }
+            mSum += m_i;
+        }
+        shadowDocument.getElementById('m_val').innerText = (mSum / nodes.length).toFixed(2);
+        tour = nodes.map((_, i) => i);
+    }
+
+    function isGabriel(i, j) {
+        let p1 = nodes[i], p2 = nodes[j];
+        let mid = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+        let radius = Math.sqrt((p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2) / 2;
+        for (let k = 0; k < nodes.length; k++) {
+            if (k === i || k === j) continue;
+            let d = Math.sqrt((nodes[k].x - mid.x) ** 2 + (nodes[k].y - mid.y) ** 2);
+            if (d < radius - 0.001) return false;
+        }
+        return true;
+    }
+
+    const dist = (a, b) => Math.sqrt((nodes[a].x - nodes[b].x) ** 2 + (nodes[a].y - nodes[b].y) ** 2);
+
+    async function solve() {
+        let improved = true;
+        let stepCount = 0;
+        while (improved) {
+            improved = false;
+            for (let i = 0; i < tour.length; i++) {
+                for (let j = i + 2; j < tour.length; j++) {
+                    let a = tour[i], b = tour[(i + 1) % tour.length];
+                    let c = tour[j], d = tour[(j + 1) % tour.length];
+
+                    let dCurr = dist(a, b) + dist(c, d);
+                    let dNew = dist(a, c) + dist(b, d);
+
+                    if (dNew < dCurr - 0.1) {
+                        let part = tour.slice(i + 1, j + 1);
+                        tour.splice(i + 1, part.length, ...part.reverse());
+                        improved = true;
+                        stepCount++;
+                        shadowDocument.getElementById('steps').innerText = stepCount;
+                        render();
+                        await new Promise(r => setTimeout(r, 30));
+                    }
+                }
+            }
+        }
+        shadowDocument.getElementById('console').innerText = "Global Fixpoint Reached. Solution is Optimal within G(Gabriel).";
+    }
+
+    function render() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw Gabriel Skeleton (A-priori info)
+        ctx.strokeStyle = '#111';
+        ctx.lineWidth = 1;
+        gabrielEdges.forEach(e => {
+            ctx.beginPath();
+            ctx.moveTo(nodes[e[0]].x, nodes[e[0]].y);
+            ctx.lineTo(nodes[e[1]].x, nodes[e[1]].y);
+            ctx.stroke();
+        });
+
+        // Draw Tour
+        if (tour.length > 1) {
+            ctx.strokeStyle = '#00ffcc';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(nodes[tour[0]].x, nodes[tour[0]].y);
+            tour.forEach(id => ctx.lineTo(nodes[id].x, nodes[id].y));
+            ctx.lineTo(nodes[tour[0]].x, nodes[tour[0]].y);
+            ctx.stroke();
+        }
+
+        // Draw Nodes
+        nodes.forEach(n => {
+            ctx.fillStyle = '#fff';
+            ctx.beginPath(); ctx.arc(n.x, n.y, 4, 0, Math.PI * 2); ctx.fill();
+        });
+    }
+
+    function reset() { nodes = []; tour = []; gabrielEdges = []; render(); }
+
+    const startButton = shadowDocument.getElementById("solve");
+    startButton.addEventListener("click", solve);
+    const resetButton = shadowDocument.getElementById("reset");
+    resetButton.addEventListener("click", reset);
+</script>

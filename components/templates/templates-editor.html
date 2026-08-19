@@ -1,0 +1,111 @@
+<template>
+    <h3>create template</h3>
+    <ul></ul>
+    <div class="button-name">
+        <input id="name" /><button id="create">Create</button><button class="hidden" id="delete">Delete</button>
+    </div>
+</template>
+
+<style>
+    :host {
+        align-items: center;
+        display: flex;
+        flex-flow: column nowrap;
+        padding: 4px;
+        width: 100%;
+    }
+
+    h3 {
+        font-weight: normal;
+        opacity: .7;
+        color: var(--dark);
+    }
+
+    ul {
+        display: flex;
+        flex-flow: column nowrap;
+        font-size: 2em;
+        padding: 0;
+
+        li {
+            list-style-type: none;
+            line-height: 1.4em;
+            display: flex;
+
+            &::before {
+                content: "{";
+                color: var(--dark);
+                width: 10px;
+                visibility: hidden;
+            }
+
+            &:first-child::before {
+                visibility: visible;
+            }
+
+            &::after {
+                content: ",";
+                color: var(--dark);
+                width: 10px;
+            }
+
+            &:last-child::after {
+                content: "}";
+                color: var(--dark);
+            }
+        }
+    }
+
+    .hidden {
+        display: none;
+    }
+
+    .button-name {
+        align-self: normal;
+        border-radius: 12px;
+        display: flex;
+        flex-flow: row wrap;
+        justify-content: space-between;
+        padding: 0 10px;
+
+        input {
+            background-color: var(--dark);
+            border-top-left-radius: 12px;
+            border-bottom-left-radius: 12px;
+            border: 0;
+            color: var(--light);
+            flex-grow: 3;
+            font-size: 2em;
+            padding: 0 10px;
+
+            &:focus,
+            &:hover {
+                outline: none;
+                color: var(--dark);
+                background-color: var(--highlight);
+                opacity: 1;
+            }
+        }
+
+        button {
+            color: var(--dark);
+            background-color: var(--gold);
+            border: none;
+            border-left: 2px solid var(--dark);
+            border-bottom-right-radius: 12px;
+            border-top-right-radius: 12px;
+            cursor: pointer;
+            flex-grow: 1;
+            font-size: medium;
+            font-weight: bold;
+            padding: 16px;
+
+            &:hover,
+            &:focus {
+                color: var(--dark);
+                background-color: var(--highlight);
+                outline: none;
+            }
+        }
+    }
+</style>

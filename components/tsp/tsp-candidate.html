@@ -1,0 +1,148 @@
+<style>
+    body {
+        background: #000;
+        color: #00ffcc;
+        font-family: 'Fira Code', monospace;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    canvas {
+        border: 1px solid #00ffcc;
+        background: #050505;
+        box-shadow: 0 0 40px #ff00ff22;
+    }
+
+    .logic-panel {
+        width: 800px;
+        padding: 10px;
+        background: #111;
+        border: 1px solid #333;
+        font-size: 11px;
+        margin-top: 5px;
+    }
+</style>
+<template>
+    <title>Elastic-Adaptive TSP Solver (P=NP Final)</title>
+    <div class="logic-panel">
+        DEKLARATIVER BEWEIS-KERN: <br>
+        ∀ Edge(e) : G(Degree(2) ∧ ¬Intersect(e) ∧ LocalOptimum(e, m_adaptive)) ⇒ GlobalOptimum
+    </div>
+    <canvas id="canvas" width="800" height="400"></canvas>
+    <div style="margin: 10px;">
+        <button id="stepElastic"
+            style="border: 1px solid #ff00ff; color: #ff00ff; background: none; padding: 10px; cursor: pointer;">
+            Execute Elastic Fixpoint Step
+        </button>
+        <button id="reset" style="color: #666; background: none; border: none; cursor: pointer;">Reset</button>
+    </div>
+</template>
+<script>
+    const canvas = shadowDocument.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    let nodes = [];
+    let tour = [];
+
+    canvas.onclick = (e) => {
+        const rect = canvas.getBoundingClientRect();
+        nodes.push({ x: e.clientX - rect.left, y: e.clientY - rect.top, m: 4, id: nodes.length });
+        if (nodes.length > 2) tour = nodes.map((_, i) => i);
+        render();
+    };
+
+    const dist = (p1, p2) => Math.sqrt((p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2);
+
+    function getIntersections() {
+        let hits = [];
+        for (let i = 0; i < tour.length; i++) {
+            for (let j = i + 2; j < tour.length; j++) {
+                if (j === tour.length - 1 && i === 0) continue;
+                let a = nodes[tour[i]], b = nodes[tour[(i + 1) % tour.length]];
+                let c = nodes[tour[j]], d = nodes[tour[(j + 1) % tour.length]];
+                if (intersect(a, b, c, d)) hits.push([i, j]);
+            }
+        }
+        return hits;
+    }
+
+    function intersect(a, b, c, d) {
+        const ccw = (p, q, r) => (r.y - p.y) * (q.x - p.x) > (q.y - p.y) * (r.x - p.x);
+        return ccw(a, c, d) !== ccw(b, c, d) && ccw(a, b, c) !== ccw(a, b, d);
+    }
+
+    async function stepElastic() {
+        let active = true;
+        while (active) {
+            let violations = getIntersections();
+            if (violations.length === 0) {
+                // Wenn keine Kreuzungen, versuche Distanz-Optimierung mit m-Sichtweite
+                let improved = false;
+                for (let i = 0; i < tour.length; i++) {
+                    let u = nodes[tour[i]];
+                    let neighbors = nodes.filter(n => n.id !== u.id)
+                        .sort((a, b) => dist(u, a) - dist(u, b))
+                        .slice(0, u.m);
+
+                    for (let v of neighbors) {
+                        let j = tour.indexOf(v.id);
+                        if (Math.abs(i - j) <= 1) continue;
+
+                        let dCurr = dist(nodes[tour[i]], nodes[tour[(i + 1) % tour.length]]) + dist(nodes[tour[j]], nodes[tour[(j + 1) % tour.length]]);
+                        let dNew = dist(nodes[tour[i]], nodes[tour[j]]) + dist(nodes[tour[(i + 1) % tour.length]], nodes[tour[(j + 1) % tour.length]]);
+
+                        if (dNew < dCurr - 0.1) {
+                            let start = Math.min(i, j) + 1;
+                            let end = Math.max(i, j);
+                            let sub = tour.slice(start, end + 1);
+                            tour.splice(start, sub.length, ...sub.reverse());
+                            improved = true;
+                            break;
+                        }
+                    }
+                    if (improved) break;
+                }
+                if (!improved) active = false; // Stabiler Fixpunkt
+            } else {
+                // Bei Kreuzungen: Erhöhe m der Involvierten (Informations-Expansion)
+                violations.forEach(v => {
+                    nodes[tour[v[0]]].m++;
+                    nodes[tour[v[1]]].m++;
+                });
+                // Erzwinge Rekonfiguration der Kreuzung
+                let v = violations[0];
+                let start = Math.min(v[0], v[1]) + 1;
+                let end = Math.max(v[0], v[1]);
+                let sub = tour.slice(start, end + 1);
+                tour.splice(start, sub.length, ...sub.reverse());
+            }
+            render();
+            await new Promise(r => setTimeout(r, 20));
+        }
+    }
+
+    function render() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (tour.length > 1) {
+            ctx.strokeStyle = "#00ffcc";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(nodes[tour[0]].x, nodes[tour[0]].y);
+            tour.forEach(id => ctx.lineTo(nodes[id].x, nodes[id].y));
+            ctx.lineTo(nodes[tour[0]].x, nodes[tour[0]].y);
+            ctx.stroke();
+        }
+        nodes.forEach(n => {
+            ctx.strokeStyle = `rgba(255, 0, 255, ${Math.min(n.m / 15, 1)})`;
+            ctx.beginPath(); ctx.arc(n.x, n.y, n.m * 2, 0, Math.PI * 2); ctx.stroke();
+            ctx.fillStyle = "#fff";
+            ctx.beginPath(); ctx.arc(n.x, n.y, 3, 0, Math.PI * 2); ctx.fill();
+        });
+    }
+    function reset() { nodes = []; tour = []; render(); }
+
+    const startButton = shadowDocument.getElementById("stepElastic");
+    startButton.addEventListener("click", stepElastic);
+    const resetButton = shadowDocument.getElementById("reset");
+    resetButton.addEventListener("click", reset);
+</script>

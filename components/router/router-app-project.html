@@ -1,0 +1,301 @@
+<template>
+    <router-hamburger></router-hamburger>
+    <nav>
+        <ul>
+            <li><a href="/plan">Plan</a></li>
+            <li><a href="/execute">Execute</a></li>
+            <li><a href="/monitor">Monitor</a></li>
+        </ul>
+    </nav>
+    <behind-menu></behind-menu>
+    <main></main>
+</template>
+
+<script>
+    (function patchPushStateIIFE(history) { // to fire pushstate-Event on pushState
+        const pushStateOriginal = history.pushState;
+        history.pushState = function patchedPushState(state, unused, url) {
+            pushStateOriginal.call(history, state, unused, url);
+            dispatchEvent(new Event('pushstate'));
+        };
+    })(window.history);
+
+    let _sitemap = [
+        [
+            { "/": { "title": "Home", "template": "tsp-proof" } }
+        ], [
+            { "/plan": { "title": "Plan", "template": "project-plan" } },
+            { "/execute": { "title": "Execute", "template": "project-execute" } },
+            { "/monitor": { "title": "Monitor", "template": "project-monitor" } }
+        ]
+    ];
+
+    function getMapping(pathname) {
+        let errorMapping = { "title": "404", "template": "error-404" };  // default
+        let mapping = errorMapping;
+        let resources = pathname.split("/");
+        if (resources[1]) { // find URL in sitemap
+            for (let route of _sitemap[resources.length - 1]) {
+                if (route[pathname]) { mapping = route[pathname]; } // found
+            }
+        } else { mapping = _sitemap[0][0][pathname] } // single /
+        if (!customElements.get(mapping.template)) { return errorMapping; }
+        return mapping;
+    }
+
+    const main = shadowDocument.querySelector("main");
+    function loadContent(e) {
+        let mapping = getMapping(location.pathname);
+        main.replaceChildren(document.createElement(mapping.template));
+    }
+
+    function activate(e) {
+        shadowDocument.querySelector(".active")?.classList.remove("active");
+        for (let a of shadowDocument.querySelectorAll('a')) {
+            if (location.pathname.includes(a.getAttribute("href"))) {
+                a.closest("li").classList.add("active");
+                break;
+            }
+        }
+    }
+
+    loadContent();
+    addEventListener("popstate", loadContent);
+    addEventListener("pushstate", loadContent);
+
+    activate();
+    addEventListener("popstate", activate);
+    addEventListener("pushstate", activate);
+
+    const hamburger = shadowDocument.querySelector("router-hamburger");
+    const nav = shadowDocument.querySelector("nav");
+    hamburger.addEventListener("click", function onHamburgerClicked(e) {
+        e.preventDefault();
+        hamburger.classList.toggle("open");
+        nav.classList.toggle("open");
+    });
+
+    function onLinkClick(e) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        let li = e.target.closest("li");
+        let a = li.querySelector("a");
+        let pathname = a.getAttribute("href");
+        let mapping = getMapping(pathname);
+        history.pushState(mapping.template, mapping.title, pathname);
+    }
+
+    const links = shadowDocument.querySelectorAll("li");
+    links.forEach(li => {
+        li.addEventListener("click", onLinkClick);
+        let a = li.querySelector("a");
+        a.addEventListener("click", onLinkClick); // UX, for closest("li") in onLinkClick
+    });
+
+    // workaround to access at least the first routing level when url entered into browser's address bar 
+    const resources = (location.pathname).split("/");
+    if (resources.length > 2) { push(resources.slice(0, 2).join("/")); }
+</script>
+
+<style>
+    nav {
+        &.open {
+            transform: translateY(0);
+        }
+
+        display: flex;
+        transform: translateY(calc(-100% - 30px));
+        transition: transform 1s ease-in-out;
+        width: 100%;
+        z-index: 1;
+
+        position: sticky;
+        top: 0;
+
+        ul {
+            display: flex;
+            flex-flow: column nowrap;
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            width: inherit;
+
+            li {
+                background-color: transparent;
+                border-top: 15px solid transparent;
+                border-right: 50vw solid var(--dark);
+                border-bottom: 0px solid var(--dark);
+                border-left: 50vw solid var(--dark);
+                cursor: pointer;
+                display: flex;
+                flex-flow: row nowrap;
+                justify-content: center;
+                height: 50px;
+                position: relative;
+                z-index: 0;
+
+                &::after {
+                    position: absolute;
+                    border-top: 15px solid var(--dark);
+                    border-left: 50vw solid transparent;
+                    border-right: 50vw solid transparent;
+                    border-bottom: 0 solid transparent;
+                    content: "";
+                    display: block;
+                    top: 50px;
+                }
+
+
+                &:hover {
+                    border-left: 50vw solid var(--highlight);
+                    border-right: 50vw solid var(--highlight);
+                    border-bottom: 0px solid var(--highlight);
+                    position: relative;
+                    z-index: 1;
+
+                    &::after {
+                        border-top: 15px solid var(--highlight);
+                        z-index: 1;
+                    }
+
+                    a {
+                        opacity: 1 !important;
+                        color: var(--dark);
+                    }
+                }
+
+                a {
+                    color: var(--light);
+                    text-decoration: none;
+                    font-weight: bold;
+                    align-self: center;
+                    line-height: 30px;
+                    font-size: 30px;
+                    white-space: nowrap;
+
+                    &:hover {
+                        text-shadow: 0px 0px 8px var(--dark);
+                        transition: text-shadow .2s ease-in .05s;
+                    }
+                }
+
+                &.active {
+                    border-top: 15px solid transparent;
+                    border-left: 50vw solid var(--light);
+                    border-right: 50vw solid var(--light);
+                    border-bottom: 0px solid var(--light);
+                    position: relative;
+                    z-index: 1;
+
+                    &::after {
+                        border-top: 15px solid var(--light);
+                    }
+
+                    &:hover {
+                        border-top: 15px solid transparent;
+                        border-left: 50vw solid var(--highlight);
+                        border-right: 50vw solid var(--highlight);
+                        border-bottom: 0px solid var(--highlight);
+
+                        &::after {
+                            border-top: 15px solid var(--highlight);
+                        }
+                    }
+
+                    a {
+                        color: var(--dark);
+                    }
+                }
+            }
+        }
+    }
+
+    @media only screen and (min-width: 600px) {
+        nav {
+            overflow: hidden;
+
+            ul {
+                flex-flow: row nowrap;
+                width: calc(100% - 30px);
+
+                li {
+                    width: 33vw;
+                    border-top: 4vh solid var(--dark);
+                    border-right: 30px solid var(--dark);
+                    border-bottom: 4vh solid var(--dark);
+                    border-left: 30px solid transparent;
+                    height: 0;
+
+                    &:last-child::after {
+                        border-top: 4vh solid transparent;
+                        border-bottom: 4vh solid transparent;
+                        border-right: 0;
+                        top: 0;
+                    }
+
+                    &:last-child:hover {
+                        &&::after {
+                            border-right: 0;
+                        }
+                    }
+
+                    &::after {
+                        transform: translate(100%, -50%);
+                        border-top: 4vh solid transparent;
+                        border-right: 30px solid transparent;
+                        border-bottom: 4vh solid transparent;
+                        border-left: 30px solid var(--dark);
+                        height: 0;
+                        right: -28px;
+                        top: 0;
+                    }
+
+                    &:hover {
+                        border-top: 4vh solid var(--highlight);
+                        border-right: 30px solid var(--highlight);
+                        border-bottom: 4vh solid var(--highlight);
+                        border-left: 30px solid transparent;
+
+                        &::after {
+                            border-top: 4vh solid transparent;
+                            border-right: 30px solid transparent;
+                            border-bottom: 4vh solid transparent;
+                            border-left: 30px solid var(--highlight);
+                            top: 0;
+                        }
+                    }
+
+                    &.active {
+                        border-top: 4vh solid var(--light);
+                        border-right: 30px solid var(--light);
+                        border-bottom: 4vh solid var(--light);
+                        border-left: 30px solid transparent;
+
+                        &::after {
+                            border-left: 30px solid var(--light);
+                            border-top: 4vh solid transparent;
+                        }
+
+                        &:hover {
+                            border-top: 4vh solid var(--highlight);
+                            border-right: 30px solid var(--highlight);
+                            border-bottom: 4vh solid var(--highlight);
+                            border-left: 30px solid transparent;
+
+                            &::after {
+                                border-left: 30px solid var(--highlight);
+                                border-top: 4vh solid transparent;
+                            }
+                        }
+                    }
+
+                    a {
+                        top: 0;
+                        align-self: center;
+                        position: relative;
+                    }
+                }
+            }
+        }
+    }
+</style>

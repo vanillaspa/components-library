@@ -1,0 +1,264 @@
+<style>
+    body {
+        background: #000;
+        color: #00ffcc;
+        font-family: 'Fira Code', monospace;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    canvas {
+        border: 1px solid #00ffcc;
+        background: #050505;
+        cursor: crosshair;
+    }
+
+    .controls {
+        margin-top: 15px;
+    }
+
+    button {
+        background: transparent;
+        color: #00ffcc;
+        border: 1px solid #00ffcc;
+        padding: 8px 16px;
+        cursor: pointer;
+    }
+
+    button:hover {
+        background: #00ffcc;
+        color: #000;
+    }
+
+    .status-box {
+        width: 800px;
+        padding: 10px;
+        background: #111;
+        color: #0f0;
+        font-size: 12px;
+        margin-top: 10px;
+        border-left: 3px solid #0f0;
+    }
+</style>
+
+<template>
+    <title>Global Optimal Fixpoint Solver (P=NP Candidate)</title>
+    <h2>Global Optimal Incremental Fixpoint (P=NP Candidate)</h2>
+    <canvas id="canvas" width="800" height="450"></canvas>
+    <div class="controls">
+        <button id="addNodeInteractively">Add Next Node (Optimal)</button>
+        <button id="resetSolver" style="color:red; border-color:red;">Reset</button>
+    </div>
+    <div class="status-box" id="log">Status: Click 'Add Next Node' or on Canvas to add nodes.</div>
+</template>
+
+<script>
+    const canvas = shadowDocument.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    let allNodes = []; // Alle hinzugefügten Punkte
+    let currentPath = []; // Der aktuell beste Pfad
+
+    canvas.onclick = (e) => {
+        const rect = canvas.getBoundingClientRect();
+        allNodes.push({ x: e.clientX - rect.left, y: e.clientY - rect.top, id: allNodes.length });
+        render();
+        log(`Node ${allNodes.length - 1} added. Click 'Add Next Node' to optimize.`);
+    };
+
+    function resetSolver() {
+        allNodes = [];
+        currentPath = [];
+        render();
+        log("Solver reset. Start adding nodes.");
+    }
+
+    const getDist = (n1, n2) => Math.sqrt((n1.x - n2.x) ** 2 + (n1.y - n2.y) ** 2);
+
+    function calculateTotalDist(pathIndices) {
+        let d = 0;
+        if (pathIndices.length < 2) return 0;
+        for (let i = 0; i < pathIndices.length; i++) {
+            d += getDist(allNodes[pathIndices[i]], allNodes[pathIndices[(i + 1) % pathIndices.length]]);
+        }
+        return d;
+    }
+
+    // Prüft auf Kreuzungen - ein harter LTL-Constraint
+    function hasIntersections(pathIndices) {
+        if (pathIndices.length < 4) return false;
+        for (let i = 0; i < pathIndices.length; i++) {
+            const p1 = allNodes[pathIndices[i]];
+            const p2 = allNodes[pathIndices[(i + 1) % pathIndices.length]];
+            for (let j = i + 2; j < pathIndices.length; j++) {
+                if (j === pathIndices.length - 1 && i === 0) continue; // Skip adjacent segments
+                const p3 = allNodes[pathIndices[j]];
+                const p4 = allNodes[pathIndices[(j + 1) % pathIndices.length]];
+
+                if (doSegmentsIntersect(p1, p2, p3, p4)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    function doSegmentsIntersect(p1, p2, p3, p4) {
+        // Standard Line-Segment-Intersection check
+        const o1 = orientation(p1, p2, p3);
+        const o2 = orientation(p1, p2, p4);
+        const o3 = orientation(p3, p4, p1);
+        const o4 = orientation(p3, p4, p2);
+
+        if (o1 !== 0 && o2 !== 0 && o3 !== 0 && o4 !== 0 && o1 !== o2 && o3 !== o4) return true; // General case
+
+        // Collinear cases
+        if (o1 === 0 && onSegment(p1, p3, p2)) return true;
+        if (o2 === 0 && onSegment(p1, p4, p2)) return true;
+        if (o3 === 0 && onSegment(p3, p1, p4)) return true;
+        if (o4 === 0 && onSegment(p3, p2, p4)) return true;
+
+        return false;
+    }
+
+    function orientation(p, q, r) {
+        const val = (q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y);
+        if (val === 0) return 0; // Collinear
+        return (val > 0) ? 1 : 2; // Clockwise or Counterclockwise
+    }
+
+    function onSegment(p, q, r) {
+        return q.x <= Math.max(p.x, r.x) && q.x >= Math.min(p.x, r.x) &&
+            q.y <= Math.max(p.y, r.y) && q.y >= Math.min(p.y, r.y);
+    }
+
+
+    async function addNodeInteractively() {
+        if (allNodes.length === 0) {
+            log("Please add nodes by clicking on the canvas first.");
+            return;
+        }
+
+        // Welchen Knoten wollen wir hinzufügen? Den nächsten noch nicht im Pfad
+        const nextNodeToAdd = allNodes.find(node => !currentPath.includes(node.id));
+        if (!nextNodeToAdd) {
+            log("All nodes are already in the path.");
+            return;
+        }
+
+        if (currentPath.length < 2) { // Basis: Füge die ersten 2-3 Knoten hinzu
+            currentPath.push(nextNodeToAdd.id);
+            if (currentPath.length === 2) { // Initiales 2-Opt auf 2 Knoten hat keinen Sinn, brauchen 3
+                currentPath.push(allNodes.find(node => node.id !== nextNodeToAdd.id && !currentPath.includes(node.id)).id);
+                // Sortiere initial, um ein Dreieck zu bilden
+                currentPath.sort((a, b) => a - b);
+            }
+            log(`Added node ${nextNodeToAdd.id}. Path: ${currentPath}.`);
+            render();
+            return;
+        }
+
+        let bestOverallPath = null;
+        let minOverallCost = Infinity;
+
+        // Iteriere über ALLE möglichen Einfügepositionen
+        for (let i = 0; i < currentPath.length; i++) {
+            let tempPath = [...currentPath];
+            tempPath.splice(i + 1, 0, nextNodeToAdd.id);
+
+            // Nach jeder Einfügung: Deklarative Fixpunkt-Rekonfiguration
+            let fixedPath = await applyFixpoint(tempPath, `Testing insertion at index ${i + 1} for node ${nextNodeToAdd.id}`);
+
+            if (fixedPath && !hasIntersections(fixedPath)) {
+                const cost = calculateTotalDist(fixedPath);
+                if (cost < minOverallCost) {
+                    minOverallCost = cost;
+                    bestOverallPath = fixedPath;
+                }
+            }
+        }
+
+        if (bestOverallPath) {
+            currentPath = bestOverallPath;
+            log(`Node ${nextNodeToAdd.id} optimally inserted. Total cost: ${minOverallCost.toFixed(2)}. Path: ${currentPath}.`);
+        } else {
+            log(`Could not optimally insert node ${nextNodeToAdd.id}. No valid path found.`);
+        }
+        render();
+    }
+
+
+    async function applyFixpoint(pathIndices, debugMsg) {
+        let tempPath = [...pathIndices];
+        let improved = true;
+        let iterations = 0;
+        const MAX_FIXPOINT_ITERATIONS = 100; // Schutz vor Endlosschleifen
+
+        while (improved && iterations < MAX_FIXPOINT_ITERATIONS) {
+            improved = false;
+            let bestSwap = null;
+            let bestGain = 0;
+
+            for (let i = 0; i < tempPath.length; i++) {
+                for (let j = i + 2; j < tempPath.length; j++) {
+                    if (j === tempPath.length - 1 && i === 0) continue; // Avoid wrapping on direct neighbours for 2-opt
+
+                    const a = tempPath[i], b = tempPath[(i + 1) % tempPath.length];
+                    const c = tempPath[j], d = tempPath[(j + 1) % tempPath.length];
+
+                    const dCurrent = getDist(allNodes[a], allNodes[b]) + getDist(allNodes[c], allNodes[d]);
+                    const dNew = getDist(allNodes[a], allNodes[c]) + getDist(allNodes[b], allNodes[d]);
+                    const gain = dCurrent - dNew;
+
+                    if (gain > bestGain) { // Nur Verbesserungen zählen
+                        bestGain = gain;
+                        bestSwap = { i, j };
+                    }
+                }
+            }
+
+            if (bestSwap && bestGain > 0.001) { // Nur signifikante Verbesserungen
+                let part = tempPath.slice(bestSwap.i + 1, bestSwap.j + 1);
+                tempPath.splice(bestSwap.i + 1, part.length, ...part.reverse());
+                improved = true;
+            }
+            iterations++;
+        }
+
+        // Finaler Check: Ist der Fixpunkt kreuzungsfrei?
+        if (hasIntersections(tempPath)) {
+            return null; // Dieser Pfad ist ungültig
+        }
+        return tempPath;
+    }
+
+
+    function log(msg) { shadowDocument.getElementById('log').innerText = msg; }
+
+    function render() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Zeichne den aktuell besten Pfad
+        if (currentPath.length > 1) {
+            ctx.strokeStyle = "#00ffcc";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(allNodes[currentPath[0]].x, allNodes[currentPath[0]].y);
+            currentPath.forEach(idx => ctx.lineTo(allNodes[idx].x, allNodes[idx].y));
+            ctx.lineTo(allNodes[currentPath[0]].x, allNodes[currentPath[0]].y);
+            ctx.stroke();
+        }
+
+        // Zeichne alle hinzugefügten Nodes
+        allNodes.forEach(n => {
+            ctx.fillStyle = "#fff";
+            ctx.beginPath(); ctx.arc(n.x, n.y, 4, 0, Math.PI * 2); ctx.fill();
+            ctx.fillText(n.id, n.x + 5, n.y - 5);
+        });
+    }
+
+    const startButton = shadowDocument.getElementById("addNodeInteractively");
+    startButton.addEventListener("click", addNodeInteractively);
+    const resetButton = shadowDocument.getElementById("resetSolver");
+    resetButton.addEventListener("click", resetSolver);
+</script>

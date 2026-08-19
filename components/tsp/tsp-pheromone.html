@@ -1,0 +1,130 @@
+<style>
+    body {
+        background: #000;
+        color: #0f0;
+        font-family: 'Courier New', monospace;
+        overflow: hidden;
+    }
+
+    canvas {
+        display: block;
+        margin: auto;
+    }
+
+    .stats {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        pointer-events: none;
+    }
+</style>
+
+<template>
+    <title>Visualizing the Optimum - Pheromone TSP</title>
+    <div class="stats" id="stats">Klicke, um Städte zu setzen...</div>
+    <canvas id="canvas"></canvas>
+</template>
+
+<script>
+    const canvas = shadowDocument.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    let nodes = [];
+    let pheromones = [];
+    let bestPath = [];
+    let minCost = Infinity;
+
+    canvas.onclick = (e) => {
+        nodes.push({ x: e.clientX, y: e.clientY });
+        initPheromones();
+        render();
+    };
+
+    function initPheromones() {
+        pheromones = Array.from({ length: nodes.length }, () => Array(nodes.length).fill(0.1));
+    }
+
+    const getDist = (i, j) => Math.sqrt((nodes[i].x - nodes[j].x) ** 2 + (nodes[i].y - nodes[j].y) ** 2);
+
+    function render() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 1. "Das Gedächtnis sehen": Zeichne die Pheromon-Matrix
+        for (let i = 0; i < nodes.length; i++) {
+            for (let j = i + 1; j < nodes.length; j++) {
+                let p = pheromones[i][j];
+                if (p > 0.11) {
+                    ctx.strokeStyle = `rgba(0, 255, 100, ${Math.min(p / 5, 0.8)})`;
+                    ctx.lineWidth = p;
+                    ctx.beginPath();
+                    ctx.moveTo(nodes[i].x, nodes[i].y);
+                    ctx.lineTo(nodes[j].x, nodes[j].y);
+                    ctx.stroke();
+                }
+            }
+        }
+
+        // 2. Städte zeichnen
+        nodes.forEach(n => {
+            ctx.fillStyle = "#fff";
+            ctx.beginPath(); ctx.arc(n.x, n.y, 4, 0, Math.PI * 2); ctx.fill();
+        });
+
+        // 3. Besten Pfad zeichnen
+        if (bestPath.length > 0) {
+            ctx.strokeStyle = "#0f0";
+            ctx.lineWidth = 2;
+            ctx.setLineDash([]);
+            ctx.beginPath();
+            bestPath.forEach((idx, i) => {
+                if (i === 0) ctx.moveTo(nodes[idx].x, nodes[idx].y);
+                else ctx.lineTo(nodes[idx].x, nodes[idx].y);
+            });
+            ctx.lineTo(nodes[bestPath[0]].x, nodes[bestPath[0]].y);
+            ctx.stroke();
+        }
+    }
+
+    async function startLogic() {
+        if (nodes.length < 3) return;
+        for (let i = 0; i < 5000; i++) {
+            let path = [0], mask = 1, cost = 0;
+            while (path.length < nodes.length) {
+                let curr = path[path.length - 1];
+                let candidates = [];
+                for (let n = 0; n < nodes.length; n++) {
+                    if (!(mask & (1 << n))) {
+                        let d = getDist(curr, n);
+                        let p = pheromones[curr][n];
+                        candidates.push({ id: n, d: d, w: Math.pow(p, 3) * (1 / Math.pow(d, 2)) });
+                    }
+                }
+                if (candidates.length === 0) break;
+                let sum = candidates.reduce((s, c) => s + c.w, 0);
+                let r = Math.random() * sum, s = 0, next = candidates[0];
+                for (let c of candidates) { s += c.w; if (r <= s) { next = c; break; } }
+                cost += next.d; path.push(next.id); mask |= (1 << next.id);
+            }
+            cost += getDist(path[path.length - 1], 0);
+
+            // Verstärkung des Gesehenen
+            let q = 100 / cost;
+            for (let j = 0; j < path.length - 1; j++) {
+                pheromones[path[j]][path[j + 1]] += q;
+                pheromones[path[j + 1]][path[j]] += q;
+            }
+            if (cost < minCost) { minCost = cost; bestPath = path; }
+
+            // Verdunstung (Vergessen von Rauschen)
+            if (i % 10 === 0) {
+                pheromones = pheromones.map(row => row.map(v => v * 0.98));
+                render();
+                shadowDocument.getElementById('stats').innerText = `Gen: ${i} | Best Cost: ${minCost.toFixed(1)}`;
+                await new Promise(r => requestAnimationFrame(r));
+            }
+        }
+    }
+    window.onkeydown = (e) => { if (e.code === 'Space') startLogic(); };
+</script>

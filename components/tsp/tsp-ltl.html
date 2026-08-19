@@ -1,0 +1,161 @@
+<style>
+    body {
+        background: #121212;
+        color: #e0e0e0;
+        font-family: 'Segoe UI', sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    canvas {
+        border: 1px solid #333;
+        background: #000;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+    }
+
+    .ui {
+        margin: 20px;
+        padding: 15px;
+        background: #1e1e1e;
+        border-radius: 8px;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+
+    button {
+        padding: 8px 16px;
+        cursor: pointer;
+        background: #00cf8d;
+        border: none;
+        color: black;
+        font-weight: bold;
+        border-radius: 4px;
+    }
+
+    #stats {
+        font-family: monospace;
+        color: #00cf8d;
+    }
+</style>
+<template>
+    <title>TSP LTL-Monitor Visualizer</title>
+    <h2>LTL-Monitor TSP Solver</h2>
+    <canvas id="canvas" width="800" height="500"></canvas>
+    <div class="ui">
+        <button id="solve">LTL-Events Starten</button>
+        <button id="reset" style="background:#444; color: white;">Reset</button>
+        <div id="stats">Warte auf Eingabe...</div>
+    </div>
+</template>
+
+<script>
+    const canvas = shadowDocument.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    let cities = [];
+
+    // Städte per Klick setzen
+    canvas.onclick = (e) => {
+        const rect = canvas.getBoundingClientRect();
+        cities.push({ x: e.clientX - rect.left, y: e.clientY - rect.top, id: cities.length });
+        render();
+    };
+
+    function reset() { cities = []; render(); shadowDocument.getElementById('stats').innerText = "Bereit."; }
+
+    function render(activePath = [], bestPath = []) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Städte zeichnen
+        cities.forEach(c => {
+            ctx.fillStyle = "#555";
+            ctx.beginPath(); ctx.arc(c.x, c.y, 4, 0, Math.PI * 2); ctx.fill();
+        });
+
+        // Besten Pfad (optimaler Automat) zeichnen
+        if (bestPath.length > 0) {
+            ctx.strokeStyle = "#00cf8d";
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            bestPath.forEach((idx, i) => {
+                const p = cities[idx];
+                if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+            });
+            ctx.lineTo(cities[bestPath[0]].x, cities[bestPath[0]].y);
+            ctx.stroke();
+        }
+    }
+
+    const getDist = (a, b) => Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
+
+    async function solve() {
+        if (cities.length < 3) return;
+        const n = cities.length;
+        const fullMask = (1 << n) - 1;
+        const stats = shadowDocument.getElementById('stats');
+
+        // Initialer Zustand des Monitor-Ensembles
+        // Jeder Monitor prüft: G(visited_once) & F(all_visited) & (cost < min)
+        let queue = [{
+            curr: 0,
+            mask: 1,
+            cost: 0,
+            path: [0]
+        }];
+
+        let minCost = Infinity;
+        let bestPath = [];
+        let processedMonitors = 0;
+
+        while (queue.length > 0) {
+            // Wir sortieren nach Kosten (Best-First), um die LTL-Schranke "minCost" schnell zu senken
+            queue.sort((a, b) => a.cost - b.cost);
+            let monitor = queue.shift();
+            processedMonitors++;
+
+            // LTL Regel: G(cost < minCost)
+            // Wenn ein Monitor diese Regel verletzt, wird er sofort verworfen (ablehnender Zustand)
+            if (monitor.cost >= minCost) continue;
+
+            // LTL Regel: F(all_visited) erreicht?
+            if (monitor.mask === fullMask) {
+                let total = monitor.cost + getDist(cities[monitor.curr], cities[0]);
+                if (total < minCost) {
+                    minCost = total;
+                    bestPath = monitor.path;
+                    render([], bestPath);
+                    stats.innerText = `Monitore: ${processedMonitors} | Min: ${minCost.toFixed(2)}`;
+                }
+                continue;
+            }
+
+            // Erzeuge nächste Events für diesen Monitor
+            for (let i = 0; i < n; i++) {
+                // LTL Regel: G(!visited_twice)
+                if (!(monitor.mask & (1 << i))) {
+                    const stepCost = getDist(cities[monitor.curr], cities[i]);
+
+                    // Gruppierungs-Logik: Wir erzeugen nur einen neuen Monitor, 
+                    // wenn die LTL-Bedingung potenziell wahr bleibt
+                    queue.push({
+                        curr: i,
+                        mask: monitor.mask | (1 << i),
+                        cost: monitor.cost + stepCost,
+                        path: [...monitor.path, i]
+                    });
+                }
+            }
+
+            // Visuelles Feedback alle 50 Monitore
+            if (processedMonitors % 50 === 0) {
+                await new Promise(r => setTimeout(r, 0));
+            }
+        }
+        stats.innerText += " - Optimaler Automat gefunden!";
+    }
+    const startButton = shadowDocument.getElementById("solve");
+    startButton.addEventListener("click", solve);
+    const resetButton = shadowDocument.getElementById("reset");
+    resetButton.addEventListener("click", reset);
+</script>

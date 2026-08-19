@@ -1,0 +1,155 @@
+<style>
+    body {
+        background: #0f0f0f;
+        color: #00ff99;
+        font-family: monospace;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    canvas {
+        border: 1px solid #00ff99;
+        background: #000;
+        cursor: crosshair;
+    }
+
+    .panel {
+        margin: 15px;
+        padding: 15px;
+        border: 1px dashed #00ff99;
+        width: 800px;
+        display: flex;
+        justify-content: space-between;
+    }
+
+    button {
+        background: transparent;
+        color: #00ff99;
+        border: 1px solid #00ff99;
+        padding: 5px 15px;
+        cursor: pointer;
+    }
+
+    button:hover {
+        background: #00ff99;
+        color: black;
+    }
+
+    .red {
+        color: #ff4444;
+    }
+</style>
+<template>
+    <title>TSP PSPACE & Sparse Visualizer</title>
+    <h2>TSP: PSPACE Recursion + Sparse Filtering</h2>
+    <canvas id="canvas" width="800" height="450"></canvas>
+    <div class="panel">
+        <div>
+            <button id="runPSPACE">Start PSPACE Flow</button>
+            <button id="reset" style="color: #ff4444; border-color: #ff4444;">Clear</button>
+        </div>
+        <div id="stats">Nodes: 0 | Best: Infinity</div>
+    </div>
+
+</template>
+<script>
+    const canvas = shadowDocument.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    let nodes = [];
+    let bestCost = Infinity;
+    let bestPath = [];
+    let currentPath = [];
+    let totalSteps = 0;
+
+    canvas.onclick = (e) => {
+        const rect = canvas.getBoundingClientRect();
+        nodes.push({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+        draw();
+    };
+
+    function reset() { nodes = []; bestCost = Infinity; bestPath = []; currentPath = []; totalSteps = 0; draw(); }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Zeichne Städte (Events)
+        nodes.forEach((n, i) => {
+            ctx.fillStyle = "#00ff99";
+            ctx.beginPath(); ctx.arc(n.x, n.y, 3, 0, Math.PI * 2); ctx.fill();
+            ctx.fillText("S" + i, n.x + 5, n.y - 5);
+        });
+
+        // Zeichne den aktuell untersuchten Pfad (Blau)
+        if (currentPath.length > 0) {
+            ctx.strokeStyle = "rgba(0, 150, 255, 0.5)";
+            ctx.setLineDash([5, 5]);
+            drawPath(currentPath);
+        }
+
+        // Zeichne den bisher optimalen Automaten-Pfad (Grün)
+        if (bestPath.length > 0) {
+            ctx.strokeStyle = "#00ff99";
+            ctx.setLineDash([]);
+            ctx.lineWidth = 2;
+            drawPath(bestPath, true);
+        }
+    }
+
+    function drawPath(path, close = false) {
+        ctx.beginPath();
+        ctx.moveTo(nodes[path[0]].x, nodes[path[0]].y);
+        for (let i = 1; i < path.length; i++) {
+            ctx.lineTo(nodes[path[i]].x, nodes[path[i]].y);
+        }
+        if (close) ctx.lineTo(nodes[path[0]].x, nodes[path[0]].y);
+        ctx.stroke();
+    }
+
+    const dist = (i, j) => Math.sqrt((nodes[i].x - nodes[j].x) ** 2 + (nodes[i].y - nodes[j].y) ** 2);
+
+    // Der PSPACE-Algorithmus: Rekursiv, platzsparend
+    async function backtrack(curr, mask, cost, path) {
+        totalSteps++;
+        currentPath = path;
+
+        // Sparse Filter: LTL G(cost < bestCost)
+        if (cost >= bestCost) return;
+
+        if (mask === (1 << nodes.length) - 1) {
+            const finalCost = cost + dist(curr, 0);
+            if (finalCost < bestCost) {
+                bestCost = finalCost;
+                bestPath = [...path];
+            }
+            return;
+        }
+
+        // Optische Verzögerung, um den Sparse-Effekt zu sehen
+        if (totalSteps % 20 === 0) {
+            shadowDocument.getElementById('stats').innerText = `Steps: ${totalSteps} | Best: ${bestCost.toFixed(1)}`;
+            draw();
+            await new Promise(r => requestAnimationFrame(r));
+        }
+
+        for (let next = 0; next < nodes.length; next++) {
+            if (!(mask & (1 << next))) {
+                await backtrack(next, mask | (1 << next), cost + dist(curr, next), [...path, next]);
+            }
+        }
+    }
+
+    async function runPSPACE() {
+        if (nodes.length < 3) return;
+        bestCost = Infinity;
+        totalSteps = 0;
+        await backtrack(0, 1, 0, [0]);
+        draw();
+        shadowDocument.getElementById('stats').innerHTML = `<span style="color:white">Optimaler Pfad fixiert! Cost: ${bestCost.toFixed(2)}</span>`;
+    }
+
+    const startButton = shadowDocument.getElementById("runPSPACE");
+    startButton.addEventListener("click", runPSPACE);
+    const resetButton = shadowDocument.getElementById("reset");
+    resetButton.addEventListener("click", reset);
+</script>

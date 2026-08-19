@@ -1,0 +1,94 @@
+<template>
+    <section class="page home-page">
+        <header>
+            <h1>Startseite</h1>
+            <p>Willkommen im Demo-Router. Nutze die Navigation oben, um Design und Scroll-Verhalten zu testen.</p>
+        </header>
+
+        <please-donate></please-donate>
+
+        <div class="cards">
+            <article class="card">
+                <h2>Übersicht</h2>
+                <p>Diese Startseite zeigt ein modernes Layout mit klaren Abschnitten, ideal für Geschäftsanwendungen.</p>
+            </article>
+            <article class="card">
+                <h2>Test-Inhalt</h2>
+                <p>Hier kannst du prüfen, wie die Seite mit langen Inhalten und Scroll-Verhalten reagiert.</p>
+            </article>
+        </div>
+
+        <section class="details">
+            <h2>Mehr Details</h2>
+            <p>Füge ausreichend Text hinzu, um das Layout über mehrere Bildschirme hinweg zu testen.</p>
+            <p>Scrolle nach unten und überprüfe, ob die Navigation sticky bleibt und der Seiteninhalt sauber dargestellt wird.</p>
+            <ul>
+                <li>Responsive Navigation</li>
+                <li>Monospace-Typografie</li>
+                <li>Professionelles Farbschema</li>
+            </ul>
+        </section>
+
+        <please-donate></please-donate>
+    </section>
+</template>
+
+<style>
+    .page {
+        padding: 32px 24px;
+        color: #222;
+        font-family: Consolas, 'Courier New', monospace;
+    }
+
+    .home-page header {
+        max-width: 780px;
+        margin-bottom: 24px;
+    }
+
+    .home-page h1 {
+        margin: 0 0 12px;
+        font-size: 2.4rem;
+        letter-spacing: -0.04em;
+    }
+
+    .home-page p {
+        line-height: 1.7;
+        margin: 0 0 18px;
+        color: #434343;
+    }
+
+    .cards {
+        display: grid;
+        gap: 18px;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        margin-bottom: 32px;
+    }
+
+    .card {
+        padding: 22px;
+        border-radius: 14px;
+        background: #f7f9ff;
+        border: 1px solid #dde3f2;
+        box-shadow: 0 12px 30px rgba(56, 97, 203, 0.06);
+    }
+
+    .card h2 {
+        margin: 0 0 10px;
+        font-size: 1.15rem;
+    }
+
+    .details {
+        max-width: 760px;
+        line-height: 1.75;
+    }
+
+    .details ul {
+        margin: 18px 0 0;
+        padding-left: 20px;
+        color: #4b5563;
+    }
+
+    .details li {
+        margin-bottom: 10px;
+    }
+</style>

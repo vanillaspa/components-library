@@ -1,0 +1,142 @@
+<style>
+    body {
+        background: #050505;
+        color: #00e5ff;
+        font-family: 'Courier New', monospace;
+        text-align: center;
+    }
+
+    canvas {
+        border: 1px solid #00e5ff;
+        background: #000;
+        box-shadow: 0 0 15px #00e5ff33;
+    }
+
+    .ui {
+        margin-top: 20px;
+        font-size: 0.9em;
+    }
+
+    button {
+        background: #00e5ff;
+        color: black;
+        border: none;
+        padding: 10px 20px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+
+    .logic-panel {
+        color: #888;
+        margin-bottom: 10px;
+    }
+</style>
+
+<template>
+    <title>Declarative TSP Solver</title>
+    <h2>Constraint-Based TSP (Declarative)</h2>
+    <div class="logic-panel">
+        Constraints: G(¬Intersect) ∧ G(Cost < Min) ∧ F(AllVisited) </div>
+            <canvas id="canvas" width="800" height="450"></canvas>
+            <div class="ui">
+                <button id="startSolving">Run Logic Engine</button>
+                <span id="stats">Nodes: 0 | Global Min: ∞</span>
+            </div>
+</template>
+
+<script>
+    const canvas = shadowDocument.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    let nodes = [];
+    let minCost = Infinity;
+    let bestPath = [];
+
+    canvas.onclick = (e) => {
+        const rect = canvas.getBoundingClientRect();
+        nodes.push({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+        render();
+    };
+
+    const getDist = (i, j) => Math.sqrt((nodes[i].x - nodes[j].x) ** 2 + (nodes[i].y - nodes[j].y) ** 2);
+
+    // Deklarative Hilfsfunktion: Prüft geometrische Konsistenz
+    function isPlanar(p1, p2, p3, p4) {
+        const det = (p2.x - p1.x) * (p4.y - p3.y) - (p2.y - p1.y) * (p4.x - p3.x);
+        if (det === 0) return false;
+        const lambda = ((p4.y - p3.y) * (p4.x - p1.x) + (p3.x - p4.x) * (p4.y - p1.y)) / det;
+        const gamma = ((p1.y - p2.y) * (p4.x - p1.x) + (p2.x - p1.x) * (p4.y - p1.y)) / det;
+        return (lambda > 0 && lambda < 1) && (gamma > 0 && gamma < 1);
+    }
+
+    async function startSolving() {
+        if (nodes.length < 3) return;
+        minCost = Infinity;
+
+        // Wir starten 2000 deklarative Versuche
+        for (let i = 0; i < 2000; i++) {
+            let path = [0], mask = 1, cost = 0;
+            let possible = true;
+
+            while (path.length < nodes.length) {
+                let curr = path[path.length - 1];
+                // Deklarative Filterung: Finde alle validen nächsten Schritte
+                let candidates = [];
+                for (let next = 0; next < nodes.length; next++) {
+                    if (!(mask & (1 << next))) {
+                        // Prüfe Constraint: Planarität (G ¬Intersect)
+                        let intersects = false;
+                        for (let j = 0; j < path.length - 1; j++) {
+                            if (isPlanar(nodes[path[j]], nodes[path[j + 1]], nodes[curr], nodes[next])) {
+                                intersects = true; break;
+                            }
+                        }
+                        if (!intersects) {
+                            let d = getDist(curr, next);
+                            candidates.push({ id: next, d: d, weight: 1 / (d * d) });
+                        }
+                    }
+                }
+
+                if (candidates.length === 0) { possible = false; break; }
+
+                // Wähle stochastisch aus dem Pool der validen Zustände
+                let totalW = candidates.reduce((s, c) => s + c.weight, 0);
+                let r = Math.random() * totalW, sum = 0, selected = candidates[0];
+                for (let c of candidates) { sum += c.weight; if (r <= sum) { selected = c; break; } }
+
+                cost += selected.d;
+                if (cost >= minCost) { possible = false; break; } // Constraint: Optimality
+
+                path.push(selected.id);
+                mask |= (1 << selected.id);
+            }
+
+            if (possible) {
+                cost += getDist(path[path.length - 1], 0);
+                if (cost < minCost) {
+                    minCost = cost; bestPath = [...path];
+                    render(bestPath);
+                    shadowDocument.getElementById('stats').innerText = `Nodes: ${nodes.length} | Global Min: ${minCost.toFixed(2)}`;
+                }
+            }
+            if (i % 50 === 0) await new Promise(r => requestAnimationFrame(r));
+        }
+    }
+
+    function render(path = []) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        nodes.forEach((n, i) => {
+            ctx.fillStyle = "#00e5ff";
+            ctx.beginPath(); ctx.arc(n.x, n.y, 4, 0, Math.PI * 2); ctx.fill();
+        });
+        if (path.length > 0) {
+            ctx.strokeStyle = "#00e5ff"; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(nodes[path[0]].x, nodes[path[0]].y);
+            path.forEach(idx => ctx.lineTo(nodes[idx].x, nodes[idx].y));
+            ctx.lineTo(nodes[path[0]].x, nodes[path[0]].y); ctx.stroke();
+        }
+    }
+
+    const startButton = shadowDocument.getElementById("startSolving");
+    startButton.addEventListener("click", startSolving);
+</script>

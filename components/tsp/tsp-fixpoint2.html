@@ -1,0 +1,151 @@
+<style>
+    body {
+        background: #000;
+        color: #00ffcc;
+        font-family: 'Fira Code', monospace;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    canvas {
+        border: 1px solid #00ffcc;
+        background: #050505;
+        box-shadow: 0 0 20px #00ffcc33;
+        cursor: crosshair;
+    }
+
+    .api-status {
+        width: 800px;
+        padding: 10px;
+        border: 1px solid #333;
+        margin-top: 10px;
+        font-size: 13px;
+    }
+
+    .highlight {
+        color: #fff;
+        font-weight: bold;
+    }
+</style>
+
+<template>
+
+
+    <title>Fixpoint Subtour Solver</title>
+    <h2>Fixpoint Iteration Engine (P-Style Approach)</h2>
+    <canvas id="canvas" width="800" height="400"></canvas>
+
+    <div class="api-status" id="status">
+        Status: <span class="highlight">Waiting for nodes...</span><br>
+        Constraint: <span id="constraint">G(Connected ∧ Degree2)</span>
+    </div>
+
+    <div style="margin-top: 15px;">
+        <button id="runFixpointIteration" id="btn">Apply Fixpoint Step</button>
+        <button id="reset" style="color:red">Reset</button>
+    </div>
+
+</template>
+<script>
+    const canvas = shadowDocument.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    let nodes = [];
+    let edges = [];
+
+    canvas.onclick = (e) => {
+        const rect = canvas.getBoundingClientRect();
+        nodes.push({ x: e.clientX - rect.left, y: e.clientY - rect.top, id: nodes.length });
+        // Initial: Jeder Knoten ist sein eigener Teilgraph (Fixpunkt-Start)
+        render();
+    };
+
+    function reset() { nodes = []; edges = []; render(); }
+
+    // Union-Find für die Identifikation von Teilgraphen
+    class UnionFind {
+        constructor(n) {
+            this.parent = Array.from({ length: n }, (_, i) => i);
+            this.count = n;
+        }
+        find(i) {
+            if (this.parent[i] === i) return i;
+            return this.parent[i] = this.find(this.parent[i]);
+        }
+        union(i, j) {
+            let rootI = this.find(i), rootJ = this.find(j);
+            if (rootI !== rootJ) { this.parent[rootI] = rootJ; this.count--; return true; }
+            return false;
+        }
+    }
+
+    async function runFixpointIteration() {
+        if (nodes.length < 2) return;
+
+        let uf = new UnionFind(nodes.length);
+        edges.forEach(e => uf.union(e.a, e.b));
+
+        shadowDocument.getElementById('status').innerHTML = `Teilgraphen: <span class="highlight">${uf.count}</span>`;
+
+        // Deklarative Regel: Wenn Teilgraphen existieren, finde die global minimalste Brücke
+        if (uf.count > 1) {
+            let bestBridge = { d: Infinity };
+
+            for (let i = 0; i < nodes.length; i++) {
+                for (let j = 0; j < nodes.length; j++) {
+                    if (uf.find(i) !== uf.find(j)) {
+                        let d = Math.sqrt((nodes[i].x - nodes[j].x) ** 2 + (nodes[i].y - nodes[j].y) ** 2);
+                        if (d < bestBridge.d) {
+                            bestBridge = { a: i, b: j, d: d };
+                        }
+                    }
+                }
+            }
+
+            if (bestBridge.d !== Infinity) {
+                edges.push({ a: bestBridge.a, b: bestBridge.b });
+                render();
+                // Rekursiver Fixpunkt-Aufruf
+                setTimeout(runFixpointIteration, 100);
+            }
+        } else {
+            // Finaler Fixpunkt-Schritt: Schließe den Kreis (Degree 2 Enforcement)
+            shadowDocument.getElementById('status').innerHTML += " | <span style='color:yellow'>Fixpunkt stabil!</span>";
+            closeCycle();
+        }
+    }
+
+    function closeCycle() {
+        // Einfache Logik, um offene Enden zu verbinden
+        let degree = new Array(nodes.length).fill(0);
+        edges.forEach(e => { degree[e.a]++; degree[e.b]++; });
+
+        let endpoints = nodes.filter((_, i) => degree[i] === 1);
+        if (endpoints.length === 2) {
+            edges.push({ a: endpoints[0].id, b: endpoints[1].id });
+            render();
+        }
+    }
+
+    function render() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.strokeStyle = "#00ffcc";
+        ctx.lineWidth = 1.5;
+        edges.forEach(e => {
+            ctx.beginPath();
+            ctx.moveTo(nodes[e.a].x, nodes[e.a].y);
+            ctx.lineTo(nodes[e.b].x, nodes[e.b].y);
+            ctx.stroke();
+        });
+        nodes.forEach(n => {
+            ctx.fillStyle = "#fff";
+            ctx.beginPath(); ctx.arc(n.x, n.y, 4, 0, Math.PI * 2); ctx.fill();
+        });
+    }
+
+
+    const runButton = shadowDocument.getElementById("runFixpointIteration");
+    runButton.addEventListener("click", runFixpointIteration);
+    const resetButton = shadowDocument.getElementById("reset");
+    resetButton.addEventListener("click", reset);
+</script>

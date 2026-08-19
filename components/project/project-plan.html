@@ -1,0 +1,95 @@
+<template>
+    <div class="tabs">
+        <button id="templatesBtn">Templates</button>
+        <button id="rulesBtn">Rules</button>
+    </div>
+    <div id="tab">
+        <p>Zum Planen bitte zuerst Fachereignisse unter Templates und dann Regeln unter Rules erstellen.</p>
+    </div>
+</template>
+
+<script>
+    const templatesBtn = shadowDocument.querySelector("#templatesBtn");
+    const rulesBtn = shadowDocument.querySelector("#rulesBtn");
+    const tab = shadowDocument.querySelector("#tab");
+    let planTemplates = document.createElement("plan-templates"); // should be reused
+    let planRules = document.createElement("plan-rules"); // should be reused
+
+    function toggleTab(e) {
+        let id = e.target.id; // button id
+        switch (id) {
+            case templatesBtn.id:
+                if (templatesBtn.classList.contains("active")) { // already active
+                    templatesBtn.classList.remove("active");
+                    tab.replaceChildren(); // remove all
+                } else { // 
+                    rulesBtn.classList.remove("active"); // for sure
+                    templatesBtn.classList.add("active");
+                    tab.replaceChildren(planTemplates); // render planTemplates
+                }
+                break;
+            case rulesBtn.id:
+                if (rulesBtn.classList.contains("active")) {
+                    rulesBtn.classList.remove("active");
+                } else {
+                    templatesBtn.classList.remove("active");
+                    rulesBtn.classList.add("active");
+                    tab.replaceChildren(planRules);
+                }
+                break;
+            default:
+        }
+    }
+
+    templatesBtn.addEventListener("click", toggleTab);
+    rulesBtn.addEventListener("click", toggleTab);
+</script>
+
+<style>
+    div.tabs {
+        background: var(--dark);
+        display: flex;
+        list-style-type: none;
+        margin: 0;
+        padding: 0;
+        text-align: center;
+
+        button {
+            flex-basis: 100%;
+            background-color: var(--dark);
+            border: none;
+            color: var(--light);
+            font-size: large;
+            padding: 6px;
+            text-decoration: none;
+            width: 100%;
+
+            &:hover {
+                background-color: var(--highlight);
+                cursor: pointer;
+                color: var(--dark);
+            }
+
+            &.active {
+                background-color: var(--light);
+                color: var(--dark);
+
+                &:hover {
+                    background-color: var(--highlight);
+                }
+            }
+
+        }
+    }
+    #tab {
+        display: flex;
+        flex-flow: row wrap;
+        justify-content: space-evenly;
+    }
+
+    .sticky {
+        position: fixed;
+        width: 100%;
+        top: 61px;
+    }
+</style>

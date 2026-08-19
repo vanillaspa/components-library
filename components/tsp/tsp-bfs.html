@@ -1,0 +1,158 @@
+<template>
+    <h2>Geometric TSP Solver</h2>
+    <canvas id="canvas" width="600" height="400"></canvas>
+    <div class="controls">
+        <button id="startSolving">Start Berechnung</button>
+        <button id="resetPoints" style="background:#666">Reset</button>
+    </div>
+    <div id="stats">Klicke ins schwarze Feld, um Städte zu setzen (max 15 empfohlen).</div>
+</template>
+
+<script>
+    const canvas = shadowDocument.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    let points = [];
+
+    // Punkt per Klick hinzufügen
+    canvas.onclick = (e) => {
+        const rect = canvas.getBoundingClientRect();
+        points.push({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+        draw();
+    };
+
+    function resetPoints() { points = []; draw(); shadowDocument.getElementById('stats').innerText = "Städte gelöscht."; }
+
+    function draw(path = []) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Zeichne Städte
+        ctx.fillStyle = "#007bff";
+        points.forEach((p, i) => {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillText(i, p.x + 8, p.y - 8);
+        });
+
+        // Zeichne Pfad
+        if (path.length > 0) {
+            ctx.strokeStyle = "#28a745";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(points[path[0]].x, points[path[0]].y);
+            for (let i = 1; i < path.length; i++) {
+                ctx.lineTo(points[path[i]].x, points[path[i]].y);
+            }
+            ctx.lineTo(points[path[0]].x, points[path[0]].y); // Zurück zum Start
+            ctx.stroke();
+        }
+    }
+
+    // Schnittpunkt-Check für geometrisches Pruning
+    function intersects(p1, p2, p3, p4) {
+        const det = (p2.x - p1.x) * (p4.y - p3.y) - (p2.y - p1.y) * (p4.x - p3.x);
+        if (det === 0) return false;
+        const lambda = ((p4.y - p3.y) * (p4.x - p1.x) + (p3.x - p4.x) * (p4.y - p1.y)) / det;
+        const gamma = ((p1.y - p2.y) * (p4.x - p1.x) + (p2.x - p1.x) * (p4.y - p1.y)) / det;
+        return (0 < lambda && lambda < 1) && (0 < gamma && gamma < 1);
+    }
+
+    const dist = (p1, p2) => Math.sqrt((p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2);
+
+    async function startSolving() {
+        console.log("startSol")
+        if (points.length < 3) return;
+        const n = points.length;
+        const stats = shadowDocument.getElementById('stats');
+        const startTime = performance.now();
+
+        // Priority Queue: [aktuell, maske, kosten, pfad]
+        let pq = [{ city: 0, mask: 1, cost: 0, path: [0] }];
+        let memo = new Map();
+        let bestPath = [];
+        let minTotal = Infinity;
+
+        while (pq.length > 0) {
+            pq.sort((a, b) => a.cost - b.cost); // Einfaches A* Prinzip
+            const { city, mask, cost, path } = pq.shift();
+
+            const state = `${city}-${mask}`;
+            if (cost >= (memo.get(state) || Infinity)) continue;
+            memo.set(state, cost);
+
+            if (mask === (1 << n) - 1) {
+                const finalCost = cost + dist(points[city], points[0]);
+                if (finalCost < minTotal) {
+                    minTotal = finalCost;
+                    bestPath = path;
+                    draw(bestPath); // Live Update
+                }
+                continue;
+            }
+
+            for (let next = 0; next < n; next++) {
+                if (!(mask & (1 << next))) {
+                    // Geometrisches Pruning: Keine Schnitte erlauben
+                    let conflict = false;
+                    for (let i = 0; i < path.length - 1; i++) {
+                        if (intersects(points[path[i]], points[path[i + 1]], points[city], points[next])) {
+                            conflict = true; break;
+                        }
+                    }
+                    if (conflict) continue;
+
+                    const newCost = cost + dist(points[city], points[next]);
+                    if (newCost < minTotal) {
+                        pq.push({ city: next, mask: mask | (1 << next), cost: newCost, path: [...path, next] });
+                    }
+                }
+            }
+            // Kleiner Timeout für visuelle Effekte (optional)
+            if (pq.length % 100 === 0) await new Promise(r => setTimeout(r, 0));
+        }
+
+        const time = (performance.now() - startTime).toFixed(2);
+        stats.innerText = `Erledigt in ${time}ms. Beste Distanz: ${minTotal.toFixed(2)}`;
+        draw(bestPath);
+    }
+
+    const startButton = shadowDocument.getElementById("startSolving");
+    startButton.addEventListener("click", startSolving);
+    const resetButton = shadowDocument.getElementById("resetPoints");
+    resetButton.addEventListener("click", resetPoints);
+</script>
+
+<style>
+    body {
+        background: #1a1a1a;
+        color: white;
+        font-family: sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    canvas {
+        border: 2px solid #444;
+        background: #000;
+        cursor: crosshair;
+    }
+
+    .controls {
+        margin: 20px;
+    }
+
+    button {
+        padding: 10px 20px;
+        cursor: pointer;
+        background: #007bff;
+        color: white;
+        border: none;
+        border-radius: 5px;
+    }
+
+    #stats {
+        margin-top: 10px;
+        color: #aaa;
+    }
+</style>

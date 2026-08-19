@@ -1,0 +1,118 @@
+<style>
+    body {
+        background: #000;
+        color: #00ffcc;
+        font-family: 'Fira Code', monospace;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    canvas {
+        border: 1px solid #00ffcc;
+        background: #050505;
+    }
+
+    .stats {
+        margin: 10px;
+        font-size: 0.8em;
+        color: #888;
+    }
+</style>
+
+<template>
+    <title>Fixpoint Memory Engine</title>
+    <h3>Fixpoint with Tabu-Memory</h3>
+    <canvas id="canvas" width="800" height="400"></canvas>
+    <div class="stats" id="info">Tabu-Memory: [] | Best: ∞</div>
+    <button id="applySmartFix"
+        style="background:none; border:1px solid #0f0; color:#0f0; padding:10px; cursor:pointer;">
+        Run Memory-Guided Fix
+    </button>
+</template>
+
+<script>
+    const canvas = shadowDocument.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    let nodes = [];
+    let tour = [];
+    let tabuList = [];
+    const TABU_SIZE = 10;
+
+    canvas.onclick = (e) => {
+        const rect = canvas.getBoundingClientRect();
+        nodes.push({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+        if (nodes.length > 2) initTour();
+        render();
+    };
+
+    function initTour() {
+        tour = nodes.map((_, i) => i);
+        render();
+    }
+
+    const getDist = (i, j) => Math.sqrt((nodes[i].x - nodes[j].x) ** 2 + (nodes[i].y - nodes[j].y) ** 2);
+
+    async function applySmartFix() {
+        let iterations = 0;
+        let improved = true;
+
+        while (iterations < 500) {
+            let bestMove = null;
+            let bestGain = -Infinity;
+
+            for (let i = 0; i < tour.length - 1; i++) {
+                for (let j = i + 2; j < tour.length; j++) {
+                    const moveKey = `${tour[i]}-${tour[j]}`;
+
+                    // Gedächtnis-Check: Ist dieser Move "Tabu"?
+                    if (tabuList.includes(moveKey)) continue;
+
+                    let dCurrent = getDist(tour[i], tour[i + 1]) + getDist(tour[j], (tour[j + 1] || tour[0]));
+                    let dNew = getDist(tour[i], tour[j]) + getDist(tour[i + 1], (tour[j + 1] || tour[0]));
+                    let gain = dCurrent - dNew;
+
+                    if (gain > bestGain) {
+                        bestGain = gain;
+                        bestMove = { i, j, key: moveKey };
+                    }
+                }
+            }
+
+            if (bestMove && (bestGain > 0 || Math.random() < 0.05)) { // Erlaube minimale Verschlechterung zum Ausbrechen
+                // Rekonfiguration
+                let part = tour.slice(bestMove.i + 1, bestMove.bestMovej + 1);
+                tour.splice(bestMove.i + 1, part.length, ...part.reverse());
+
+                // Gedächtnis aktualisieren
+                tabuList.push(bestMove.key);
+                if (tabuList.length > TABU_SIZE) tabuList.shift();
+
+                render();
+                shadowDocument.getElementById('info').innerText = `Memory: [${tabuList.join('|')}] | Gain: ${bestGain.toFixed(2)}`;
+                await new Promise(r => setTimeout(r, 30));
+            } else {
+                break;
+            }
+            iterations++;
+        }
+    }
+
+    function render() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (tour.length > 0) {
+            ctx.strokeStyle = "#00ffcc";
+            ctx.beginPath();
+            ctx.moveTo(nodes[tour[0]].x, nodes[tour[0]].y);
+            tour.forEach(idx => ctx.lineTo(nodes[idx].x, nodes[idx].y));
+            ctx.lineTo(nodes[tour[0]].x, nodes[tour[0]].y);
+            ctx.stroke();
+        }
+        nodes.forEach(n => {
+            ctx.fillStyle = "#fff";
+            ctx.beginPath(); ctx.arc(n.x, n.y, 4, 0, Math.PI * 2); ctx.fill();
+        });
+    }
+    const startButton = shadowDocument.getElementById("applySmartFix");
+    startButton.addEventListener("click", applySmartFix);
+</script>

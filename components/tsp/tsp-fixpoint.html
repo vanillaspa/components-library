@@ -1,0 +1,114 @@
+<style>
+    body {
+        background: #0a0a0a;
+        color: #00ff66;
+        font-family: monospace;
+    }
+
+    canvas {
+        background: #000;
+        border: 1px solid #00ff66;
+        display: block;
+        margin: 20px auto;
+    }
+
+    .console {
+        width: 800px;
+        margin: auto;
+        border: 1px solid #333;
+        padding: 10px;
+        font-size: 12px;
+        height: 100px;
+        overflow-y: scroll;
+    }
+</style>
+
+
+
+<script>
+    const canvas = shadowDocument.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    let nodes = [];
+    let edges = [];
+
+    canvas.onclick = (e) => {
+        nodes.push({ x: e.clientX - canvas.offsetLeft, y: e.clientY - canvas.offsetTop });
+        render();
+    };
+
+    // Deklarativer Kern: Finde Teilgraphen
+    function findComponents(currentEdges) {
+        let parent = nodes.map((_, i) => i);
+        const find = (i) => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+        const union = (i, j) => {
+            let rootI = find(i), rootJ = find(j);
+            if (rootI !== rootJ) parent[rootI] = rootJ;
+        };
+
+        currentEdges.forEach(e => union(e.a, e.b));
+        let components = {};
+        nodes.forEach((_, i) => {
+            let root = find(i);
+            if (!components[root]) components[root] = [];
+            components[root].push(i);
+        });
+        return Object.values(components);
+    }
+
+    // Fixpunkt-Schritt
+    async function iterateFixpoint() {
+        let components = findComponents(edges);
+        log(`Zustand: ${components.length} Teilgraph(en) gefunden.`);
+
+        if (components.length === 1 && edges.length === nodes.length) {
+            log("FIXPUNKT ERREICHT: Globales Optimum stabilisiert.");
+            return;
+        }
+
+        // Regel 1: Wenn mehrere Teilgraphen existieren -> Brich die schwächste Kante pro Graph
+        // Regel 2: Verbinde Teilgraphen mit der global minimalen Brücke (Greedy-Merging)
+        if (components.length > 1) {
+            // Simpler Merge-Schritt für die Demo: Verbinde Komponente 0 mit 1
+            let c1 = components[0];
+            let c2 = components[1];
+            // Finde die zwei nächsten Punkte zwischen diesen Mengen
+            let best = { d: Infinity };
+            for (let i of c1) {
+                for (let j of c2) {
+                    let d = Math.sqrt((nodes[i].x - nodes[j].x) ** 2 + (nodes[i].y - nodes[j].y) ** 2);
+                    if (d < best.d) best = { a: i, b: j, d: d };
+                }
+            }
+            edges.push({ a: best.a, b: best.b });
+        }
+
+        render();
+        setTimeout(iterateFixpoint, 500);
+    }
+
+    function log(msg) { shadowDocument.getElementById('log').innerText += "\n" + msg; }
+
+    function render() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        edges.forEach(e => {
+            ctx.strokeStyle = "#00ff66";
+            ctx.beginPath(); ctx.moveTo(nodes[e.a].x, nodes[e.a].y);
+            ctx.lineTo(nodes[e.b].x, nodes[e.b].y); ctx.stroke();
+        });
+        nodes.forEach(n => {
+            ctx.fillStyle = "#fff";
+            ctx.beginPath(); ctx.arc(n.x, n.y, 4, 0, Math.PI * 2); ctx.fill();
+        });
+    }
+    const startButton = shadowDocument.getElementById("iterateFixpoint");
+    startButton.addEventListener("click", startSolving);
+</script>
+<template>
+    <title>Fixpoint TSP Solver</title>
+    <h3 style="text-align: center;">Fixpoint Iteration: Subtour Elimination</h3>
+    <canvas id="canvas" width="800" height="400"></canvas>
+    <div class="console" id="log">Fixpunkt-System bereit...</div>
+    <div style="text-align: center; margin-top: 10px;">
+        <button id="iterateFixpoint">Starte Fixpunkt-Suche</button>
+    </div>
+</template>

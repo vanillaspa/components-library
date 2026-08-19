@@ -1,0 +1,23 @@
+<template>
+    <templates-editor />
+    <templates-list />
+</template>
+
+<script></script>
+
+<style>
+    :host {
+        display: grid;
+        width: 100%;
+        grid-template-areas: "editor list";
+        grid-template-columns: 66% 34%;
+    }
+
+    templates-editor {
+        grid-area: editor;
+    }
+
+    templates-list {
+        grid-area: list;
+    }
+</style>

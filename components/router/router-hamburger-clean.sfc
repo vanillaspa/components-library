@@ -1,0 +1,51 @@
+<template>
+    <div class="hamburger">
+        <span class="hamburger-line"></span>
+        <span class="hamburger-line"></span>
+        <span class="hamburger-line"></span>
+    </div>
+</template>
+
+<style>
+    :host {
+        cursor: pointer;
+    }
+
+    .hamburger {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        padding: 9px;
+
+        .hamburger-line {
+            width: 24px;
+            height: 3px;
+            background-color: var(--primary);
+            border-radius: 2px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transform-origin: center center;
+        }
+    }
+
+    :host(:hover) .hamburger-line {
+        background-color: var(--primary-dark);
+    }
+
+    :host(.open) {
+        .hamburger-line:nth-child(1) {
+            transform: translateY(6px) rotate(45deg);
+        }
+        .hamburger-line:nth-child(2) {
+            opacity: 0;
+        }
+        .hamburger-line:nth-child(3) {
+            transform: translateY(-6px) rotate(-45deg);
+        }
+    }
+
+    @media (min-width: 769px) {
+        :host {
+            display: none;
+        }
+    }
+</style>

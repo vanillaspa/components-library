@@ -1,0 +1,307 @@
+<template>
+    <header class="navbar">
+        <div class="navbar-container">
+            <div class="navbar-brand">
+                <a href="/" class="home-link"><span class="logo">Demo App</span></a>
+            </div>
+            <router-hamburger></router-hamburger>
+            <nav class="nav-menu">
+                <ul>
+                    <li><a href="/persistence" class="nav-link">Persistence</a></li>
+                    <li><a href="/hero" class="nav-link">HeroQuest</a></li>
+                    <li><a href="/dragndrop" class="nav-link">Drag & Drop</a></li>
+                    <li><a href="/event-bus" class="nav-link">Event Bus</a></li>
+                    <li><a href="/project" class="nav-link">Project</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+    <main class="main-content"></main>
+</template>
+
+<script>
+    (function patchPushStateIIFE(history) { // to fire pushstate-Event on pushState
+        const pushStateOriginal = history.pushState;
+        history.pushState = function patchedPushState(state, unused, url) {
+            pushStateOriginal.call(history, state, unused, url);
+            dispatchEvent(new Event('pushstate'));
+        };
+    })(window.history);
+
+    let _sitemap = [
+        { "title": "Home", "template": "home-page" },
+        {
+            "persistence": { "title": "Persistence", "template": "sqlite-workers" },
+            "hero": { "title": "HeroQuest", "template": "hero-quest" },
+            "dragndrop": { "title": "DragnDrop", "template": "dragndrop-container" },
+            "event-bus": { "title": "EventBus", "template": "event-bus-test" },
+            "project": { "title": "Project", "template": "project-app" }
+        },
+        {
+            "project": {
+                "plan": { "title": "Plan", "template": "project-plan" },
+                "execute": { "title": "Execute", "template": "project-execute" },
+                "monitor": { "title": "Monitor", "template": "project-monitor" }
+            }
+        },
+        {
+            "plan": {
+                "templates": { "title": "Tempaltes", "template": "project-templates" },
+                "rules": { "title": "Rules", "template": "project-rules" },
+            }
+        }
+    ];
+
+    let errorMapping = { "template": "error-404" };
+
+    function getMapping(pathname) { // "/project/plan"
+        let level = 0;
+        let mapping = _sitemap[level]; // { "template": "home-page" }
+        let resources = pathname.split("/"); // ["", "project", "plan"]
+        let step = resources[level]; // ""
+        let lastStep = step;
+        if (pathname == "/") {
+            return mapping;
+        }
+
+        while (++level < resources.length) {
+            step = resources[level]; // "plan"
+            if (level == 1) {
+                if (step in _sitemap[level]) {
+                    mapping = _sitemap[level][step];
+                } else {
+                    mapping = errorMapping;
+                }
+            } else {
+                if (step in _sitemap[level][lastStep]) {
+                    mapping = _sitemap[level][lastStep][step];
+                } else {
+                    mapping = errorMapping;
+                }
+            }
+            lastStep = step;
+        }
+
+        if (!customElements.get(mapping.template)) { return errorMapping; }
+        return mapping;
+    }
+
+    const main = shadowDocument.querySelector(".main-content");
+    function loadContent(e) {
+        let mapping = getMapping(location.pathname);
+        main.replaceChildren(document.createElement(mapping.template));
+    }
+
+    function activate(e) {
+        shadowDocument.querySelector(".nav-link.active")?.classList.remove("active");
+        for (let a of shadowDocument.querySelectorAll('.nav-link')) {
+            if (location.pathname.includes(a.getAttribute("href"))) {
+                a.classList.add("active");
+                break;
+            }
+        }
+    }
+
+    loadContent();
+    addEventListener("popstate", loadContent);
+    addEventListener("pushstate", loadContent);
+
+    activate();
+    addEventListener("popstate", activate);
+    addEventListener("pushstate", activate);
+
+    const hamburger = shadowDocument.querySelector("router-hamburger");
+    const navMenu = shadowDocument.querySelector(".nav-menu");
+    hamburger.addEventListener("click", function onHamburgerClicked(e) {
+        e.preventDefault();
+        hamburger.classList.toggle("open");
+        navMenu.classList.toggle("open");
+    });
+
+    function onLinkClick(e) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        let a = e.target.closest("a");
+        let pathname = a.getAttribute("href");
+        link(pathname);
+    }
+
+    eventbus.addEventListener('router:link', linkEvent, shadowDocument.host);
+
+    function linkEvent(e) {
+        link(e.detail.pathname);
+    }
+    function link(pathname) {
+        console.log({pathname});
+        let mapping = getMapping(pathname);
+        console.log({ mapping });
+        history.pushState(mapping.template, mapping.title, pathname);
+    }
+    const links = shadowDocument.querySelectorAll(".nav-link, .home-link");
+    links.forEach(a => {
+        a.addEventListener("click", onLinkClick);
+    });
+
+    // workaround to access at least the first routing level when url entered into browser's address bar 
+    // const resources = (location.pathname).split("/");
+    // if (resources.length > 2) { push(resources.slice(0, 2).join("/")); }
+</script>
+
+<style>
+    /* mobile first */
+    :host {
+        --bg: #ffffff;
+        --bg-light: #f8f9fa;
+        --border: #e0e0e0;
+        --border-light: #f0f0f0;
+        --link-bg: rgba(37, 99, 235, 0.1);
+        --primary: #2563eb;
+        --primary-dark: #1e40af;
+        --text: #4b5563;
+        --text-dark: #1a1a1a;
+    }
+
+    .navbar {
+        background: linear-gradient(135deg, var(--bg) 0%, var(--bg-light) 100%);
+        border-bottom: 1px solid var(--border);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, .06);
+        position: sticky;
+        top: 0;
+        z-index: 99;
+
+        .navbar-container {
+            align-items: center;
+            display: flex;
+            height: 60px;
+            justify-content: space-between;
+            padding: 0 15px;
+
+            .navbar-brand {
+                color: var(--text-dark);
+                font-size: 20px;
+                font-weight: 700;
+                letter-spacing: -0.5px;
+
+                .home-link {
+                    text-decoration: none;
+
+                    .logo {
+                        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+                        -webkit-background-clip: text;
+                        -webkit-text-fill-color: transparent;
+                        background-clip: text;
+                    }
+                }
+            }
+
+            .nav-menu {
+                background-color: var(--bg);
+                border-top: 1px solid var(--border);
+                box-shadow: 0 8px 16px rgba(0, 0, 0, .1);
+                flex-direction: column;
+                left: 0;
+                max-height: calc(100vh - 60px);
+                overflow-y: auto;
+                position: fixed;
+                text-align: center;
+                top: 60px;
+                transform: translateX(-100%);
+                transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                width: 100%;
+                will-change: transform;
+
+                &.open {
+                    transform: translateX(0);
+                }
+
+                ul {
+                    flex-direction: column;
+                    list-style: none;
+                    margin: 0;
+                    overflow: hidden;
+                    padding: 0;
+
+                    li {
+                        text-align: left;
+
+                        .nav-link {
+                            border-bottom: 1px solid var(--border-light);
+                            color: var(--text);
+                            display: block;
+                            font-size: 16px;
+                            font-weight: 500;
+                            letter-spacing: 0.3px;
+                            padding: 16px;
+                            text-decoration: none;
+                            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                            white-space: nowrap;
+
+                            &.active {
+                                background-color: var(--link-bg);
+                                border-left: 4px solid var(--primary);
+                                color: var(--primary);
+                                font-weight: 600;
+                                padding-left: 20px;
+                            }
+
+                            &:hover {
+                                background-color: var(--link-bg);
+                                color: var(--primary);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    .main-content {
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    /* Desktop styles */
+    @media (min-width: 769px) {
+        .navbar {
+            .navbar-container {
+                height: 70px;
+                padding: 0 20px;
+
+                .navbar-brand {
+                    font-size: 24px;
+                }
+
+                .nav-menu {
+                    position: static;
+                    background-color: transparent;
+                    width: auto;
+                    box-shadow: none;
+                    border-top: none;
+                    transform: none;
+
+                    ul {
+                        display: flex;
+                        flex-direction: row;
+
+                        li {
+                            .nav-link {
+                                display: block;
+                                width: auto;
+                                padding: 8px 16px;
+                                text-align: center;
+                                border-bottom: 2px solid transparent;
+
+                                &.active {
+                                    background-color: var(--link-bg);
+                                    border-bottom: 2px solid var(--primary);
+                                    padding-left: 16px;
+                                    border-left: none;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+</style>
