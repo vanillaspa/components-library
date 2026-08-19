@@ -100,7 +100,7 @@
     }
   }
 
-  export async function setSDP() {
+  async function setSDP() {
     try {
       const answerSDP = JSON.parse(shadowDocument.querySelector("#app").value);
       console.log('Setting Remote Answer...');

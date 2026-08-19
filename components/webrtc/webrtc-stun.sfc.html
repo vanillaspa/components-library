@@ -7,7 +7,7 @@
     ];
     var statsTimer = null;
 
-    export function setIceServers(serverList) {
+    function setIceServers(serverList) {
         iceServers = serverList;
         console.log('Updated STUN/TURN servers configuration:', iceServers);
     }
@@ -158,7 +158,7 @@
         }
     }
 
-    export async function initializeWithAnswer() {
+    async function initializeWithAnswer() {
         try {
             const offerSDP = JSON.parse(shadowDocument.querySelector("#app").value);
             console.log('Initializing Peer B with Answer...');
@@ -178,7 +178,7 @@
         }
     }
 
-    export async function setSDP() {
+    async function setSDP() {
         try {
             const answerSDP = JSON.parse(shadowDocument.querySelector("#app").value);
             console.log('Setting Remote Answer...');
@@ -188,7 +188,7 @@
         }
     }
 
-    export function sendToRemote() {
+    function sendToRemote() {
         try {
             const message = JSON.parse(shadowDocument.querySelector("#app").value);
             if (!dataChannel || dataChannel.readyState !== 'open') {
