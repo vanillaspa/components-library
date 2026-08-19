@@ -130,7 +130,7 @@ export async function initializeWithOffer() {
         const offer = await peerConnection.createOffer();
         await peerConnection.setLocalDescription(offer);
 
-        log('Gathering STUN/ICE candidates...');
+        console.log('Gathering STUN/ICE candidates...');
         await _waitForIceGathering();
 
         console.log(peerConnection.localDescription);
