@@ -1,0 +1,190 @@
+<style>
+  body {
+    font-family: system-ui, sans-serif;
+    max-width: 600px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+  }
+
+  .card {
+    border: 1px solid #ccc;
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+  }
+
+  textarea {
+    width: 100%;
+    height: 60px;
+    margin: 0.5rem 0;
+    word-break: break-all;
+  }
+
+  button {
+    cursor: pointer;
+    padding: 0.5rem 1rem;
+    font-weight: bold;
+  }
+
+  #chat-box {
+    border: 1px solid #ddd;
+    height: 150px;
+    overflow-y: scroll;
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+    background: #f9f9f9;
+  }
+</style>
+<template>
+
+  <h2>Zero-Backend WebRTC (URL Signaling)</h2>
+
+  <!-- Step 1: Peer A Creates Offer -->
+  <div class="card" id="step-host">
+    <h3>1. Host a Room</h3>
+    <button onclick="createOffer()">Generate Invite Link</button>
+    <div id="offer-out" style="display:none; margin-top:0.5rem;">
+      <label>Send this link to Peer B:</label>
+      <textarea id="offer-link" readonly></textarea>
+
+      <h4>3. Finalize Connection</h4>
+      <label>Paste the Answer link from Peer B here:</label>
+      <input type="text" id="answer-input" style="width: 100%;" placeholder="https://.../#answer=..." />
+      <button id="acceptAnswer" style="margin-top: 0.5rem;">Complete Connection</button>
+    </div>
+  </div>
+
+  <!-- Step 2: Peer B Accepts Offer -->
+  <div class="card" id="step-join" style="display:none;">
+    <h3>2. Join Room (Incoming Offer Detected)</h3>
+    <p>Generating answer link...</p>
+    <label>Send this response link back to Peer A:</label>
+    <textarea id="answer-link" readonly></textarea>
+  </div>
+
+  <!-- Step 3: Chat Box (Active Connection) -->
+  <div class="card" id="step-chat" style="display:none;">
+    <h3>P2P Connected!</h3>
+    <div id="chat-box"></div>
+    <input type="text" id="msg-input" placeholder="Type a message..." style="width: 70%;" />
+    <button id="sendMessage">Send</button>
+  </div>
+</template>
+<script>
+  // -------------------------------------------------------------
+  // Native Compression Helpers (Deflate + Base64 URL Safe)
+  // -------------------------------------------------------------
+  async function compressText(text) {
+    const stream = new Blob([text]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+    const buffer = await new Response(stream).arrayBuffer();
+    return btoa(String.fromCharCode(...new Uint8Array(buffer)))
+      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  async function decompressText(base64) {
+    const b64 = base64.replace(/-/g, '+').replace(/_/g, '/');
+    const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+    return await new Response(stream).text();
+  }
+
+  // -------------------------------------------------------------
+  // WebRTC Setup
+  // -------------------------------------------------------------
+  const config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+  let pc = new RTCPeerConnection(config);
+  let dataChannel = null;
+
+  function setupDataChannel(channel) {
+    dataChannel = channel;
+    dataChannel.onopen = () => {
+      shadowDocument.getElementById('step-host').style.display = 'none';
+      shadowDocument.getElementById('step-join').style.display = 'none';
+      shadowDocument.getElementById('step-chat').style.display = 'block';
+    };
+    dataChannel.onmessage = (e) => {
+      const box = shadowDocument.getElementById('chat-box');
+      box.innerHTML += `<div><b>Peer:</b> ${e.data}</div>`;
+      box.scrollTop = box.scrollHeight;
+    };
+  }
+
+  // Peer A: Generate Offer Link
+  async function createOffer() {
+    const channel = pc.createDataChannel('chat');
+    setupDataChannel(channel);
+
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+
+    // Wait for ICE candidates to gather so everything fits into ONE link
+    await new Promise(resolve => {
+      if (pc.iceGatheringState === 'complete') resolve();
+      else pc.onicecandidate = e => { if (!e.candidate) resolve(); };
+    });
+
+    const compressed = await compressText(JSON.stringify(pc.localDescription));
+    const url = `${window.location.origin}${window.location.pathname}#offer=${compressed}`;
+
+    shadowDocument.getElementById('offer-link').value = url;
+    shadowDocument.getElementById('offer-out').style.display = 'block';
+  }
+
+  // Peer B: Handle Offer Link & Generate Answer
+  async function handleIncomingOffer(compressedOffer) {
+    shadowDocument.getElementById('step-host').style.display = 'none';
+    shadowDocument.getElementById('step-join').style.display = 'block';
+
+    pc.ondatachannel = (e) => setupDataChannel(e.channel);
+
+    const offerDesc = JSON.parse(await decompressText(compressedOffer));
+    await pc.setRemoteDescription(offerDesc);
+
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+
+    // Wait for ICE gathering
+    await new Promise(resolve => {
+      if (pc.iceGatheringState === 'complete') resolve();
+      else pc.onicecandidate = e => { if (!e.candidate) resolve(); };
+    });
+
+    const compressedAnswer = await compressText(JSON.stringify(pc.localDescription));
+    const url = `${window.location.origin}${window.location.pathname}#answer=${compressedAnswer}`;
+    shadowDocument.getElementById('answer-link').value = url;
+  }
+
+  // Peer A: Finalize Connection with Answer Link
+  async function acceptAnswer() {
+    const input = shadowDocument.getElementById('answer-input').value.trim();
+    const match = input.match(/#answer=(.+)$/);
+    if (!match) return alert('Invalid Answer Link');
+
+    const answerDesc = JSON.parse(await decompressText(match[1]));
+    await pc.setRemoteDescription(answerDesc);
+  }
+
+  // Messaging UI
+  function sendMessage() {
+    const input = shadowDocument.getElementById('msg-input');
+    if (!input.value) return;
+    dataChannel.send(input.value);
+
+    const box = shadowDocument.getElementById('chat-box');
+    box.innerHTML += `<div><b>You:</b> ${input.value}</div>`;
+    box.scrollTop = box.scrollHeight;
+    input.value = '';
+  }
+
+
+  shadowDocument.querySelector("#acceptAnswer").addEventListener("click", acceptAnswer);
+  shadowDocument.querySelector("#sendMessage").addEventListener("click", sendMessage);
+
+  // Auto-detect URL Hash on Page Load
+  window.addEventListener('load', () => {
+    const hash = window.location.hash;
+    if (hash.startsWith('#offer=')) {
+      handleIncomingOffer(hash.replace('#offer=', ''));
+    }
+  });
+</script>

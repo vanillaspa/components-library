@@ -1,0 +1,314 @@
+<template>
+  <div class="card">
+    <h2>WebRTC P2P (DSGVO-konform)</h2>
+
+    <!-- 1. DSGVO Consent Banner -->
+    <div id="consentBanner" class="consent-box">
+      <h3>🔒 Datenschutz-Einwilligung</h3>
+      <p style="font-size: 0.9rem; line-height: 1.4;">
+        Für den Aufbau der Direct-P2P-Verbindung wird Ihre IP-Adresse verarbeitet.
+        Hierzu wird eine Anfrage an den STUN-Server von <strong>Google LLC (USA)</strong> gestellt.
+        Dabei kann es zu einer Übermittlung personenbezogener Daten in die USA kommen.
+      </p>
+      <button id="consentBtn" class="btn">Einwilligen & STUN aktivieren</button>
+    </div>
+
+    <!-- 2. Main App Content (Sichtbar nach Consent) -->
+    <div id="appContent" class="hidden">
+      <!-- Host Abschnitt -->
+      <div id="hostSection">
+        <h3>1. Raum erstellen (Host)</h3>
+        <button id="createOfferBtn" class="btn">Einladungs-Link erstellen</button>
+
+        <div id="offerOutput" class="hidden" style="margin-top: 1rem;">
+          <label><strong>1. Sende diesen Link an Peer B:</strong></label>
+          <textarea id="offerLink" readonly rows="3"></textarea>
+
+          <hr />
+
+          <label><strong>2. Füge den Antwort-Link von Peer B hier ein:</strong></label>
+          <input type="text" id="answerInput" placeholder="https://.../#answer=..." />
+          <button id="acceptAnswerBtn" class="btn btn-success" style="margin-top: 0.5rem;">Verbindung
+            herstellen</button>
+        </div>
+      </div>
+
+      <!-- Join Abschnitt -->
+      <div id="joinSection" class="hidden">
+        <h3>2. Raum beitreten (Client)</h3>
+        <p>Eingehende Verbindung erkannt. Generiere Antwort-Link...</p>
+        <label><strong>Sende diesen Antwort-Link zurück an Peer A:</strong></label>
+        <textarea id="answerLink" readonly rows="3"></textarea>
+      </div>
+
+      <!-- Chat Abschnitt -->
+      <div id="chatSection" class="hidden">
+        <h3 style="color: #28a745;">🟢 P2P-Verbindung aktiv</h3>
+        <div id="chatBox" class="chat-box"></div>
+        <div class="chat-input">
+          <input type="text" id="msgInput" placeholder="Nachricht schreiben..." />
+          <button id="sendBtn" class="btn">Senden</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+
+  var pc = null;
+  var dataChannel = null;
+  var rtcConfig = {
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' }
+    ]
+  };
+
+  bindEvents();
+  checkConsent();
+
+  // Shadow DOM Query Helper
+  function $(selector) {
+    return shadowDocument.querySelector(selector);
+  }
+
+  function bindEvents() {
+    $('#consentBtn').addEventListener('click', () => grantConsent());
+    $('#createOfferBtn').addEventListener('click', () => createOffer());
+    $('#acceptAnswerBtn').addEventListener('click', () => acceptAnswer());
+    $('#sendBtn').addEventListener('click', () => sendMessage());
+    $('#msgInput').addEventListener('keyup', (e) => {
+      if (e.key === 'Enter') sendMessage();
+    });
+  }
+
+  // --- DSGVO Consent Handling ---
+  function checkConsent() {
+    if (localStorage.getItem('webrtc_dsgvo_consent') === 'true') {
+      showApp();
+    }
+  }
+
+  function grantConsent() {
+    localStorage.setItem('webrtc_dsgvo_consent', 'true');
+    showApp();
+  }
+
+  function showApp() {
+    $('#consentBanner').classList.add('hidden');
+    $('#appContent').classList.remove('hidden');
+
+    // Automatisches Erkennen eines eingehenden Links
+    const hash = window.location.hash;
+    if (hash.startsWith('#offer=')) {
+      handleIncomingOffer(hash.replace('#offer=', ''));
+    }
+  }
+
+  // --- Native Compression Helpers ---
+  async function compressText(text) {
+    const stream = new Blob([text]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+    const buffer = await new Response(stream).arrayBuffer();
+    return btoa(String.fromCharCode(...new Uint8Array(buffer)))
+      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  async function decompressText(base64) {
+    const b64 = base64.replace(/-/g, '+').replace(/_/g, '/');
+    const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+    return await new Response(stream).text();
+  }
+
+  // --- WebRTC Core Logic ---
+  function setupDataChannel(channel) {
+    dataChannel = channel;
+    dataChannel.onopen = () => {
+      $('#hostSection').classList.add('hidden');
+      $('#joinSection').classList.add('hidden');
+      $('#chatSection').classList.remove('hidden');
+    };
+    dataChannel.onmessage = (e) => {
+      appendMessage('Peer', e.data, 'msg-peer');
+    };
+  }
+
+  async function createOffer() {
+    const btn = $('#createOfferBtn');
+    btn.disabled = true;
+    btn.textContent = 'Generiere...';
+
+    pc = new RTCPeerConnection(rtcConfig);
+    const channel = pc.createDataChannel('chat');
+    setupDataChannel(channel);
+
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+
+    await waitForIceGathering();
+
+    const compressed = await compressText(JSON.stringify(pc.localDescription));
+    const url = `${window.location.origin}${window.location.pathname}#offer=${compressed}`;
+
+    $('#offerLink').value = url;
+    $('#offerOutput').classList.remove('hidden');
+    btn.textContent = 'Link generiert!';
+  }
+
+  async function handleIncomingOffer(compressedOffer) {
+    $('#hostSection').classList.add('hidden');
+    $('#joinSection').classList.remove('hidden');
+
+    pc = new RTCPeerConnection(rtcConfig);
+    pc.ondatachannel = (e) => setupDataChannel(e.channel);
+
+    const offerDesc = JSON.parse(await decompressText(compressedOffer));
+    await pc.setRemoteDescription(offerDesc);
+
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+
+    await waitForIceGathering();
+
+    const compressedAnswer = await compressText(JSON.stringify(pc.localDescription));
+    const url = `${window.location.origin}${window.location.pathname}#answer=${compressedAnswer}`;
+
+    $('#answerLink').value = url;
+  }
+
+  async function acceptAnswer() {
+    const input = $('#answerInput').value.trim();
+    const match = input.match(/#answer=(.+)$/);
+    if (!match) return alert('Ungültiger Antwort-Link!');
+
+    const answerDesc = JSON.parse(await decompressText(match[1]));
+    await pc.setRemoteDescription(answerDesc);
+  }
+
+  function waitForIceGathering() {
+    return new Promise((resolve) => {
+      if (pc.iceGatheringState === 'complete') resolve();
+      else {
+        pc.onicecandidate = (e) => {
+          if (!e.candidate) resolve();
+        };
+      }
+    });
+  }
+
+  function sendMessage() {
+    const input = $('#msgInput');
+    if (!input.value.trim() || !dataChannel) return;
+
+    dataChannel.send(input.value);
+    appendMessage('Du', input.value, 'msg-you');
+    input.value = '';
+  }
+
+  function appendMessage(sender, text, className) {
+    const box = $('#chatBox');
+    const div = document.createElement('div');
+    div.className = `msg ${className}`;
+    div.innerHTML = `<b>${sender}:</b> ${text}`;
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
+  }
+
+</script>
+
+
+<style>
+  :host {
+    display: block;
+    max-width: 600px;
+    margin: 2rem auto;
+    font-family: system-ui, -apple-system, sans-serif;
+    color: #333;
+  }
+
+  .card {
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 1.5rem;
+    background: #ffffff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  }
+
+  .consent-box {
+    background: #fff3cd;
+    border: 1px solid #ffeeba;
+    padding: 1.25rem;
+    border-radius: 8px;
+    color: #856404;
+  }
+
+  .btn {
+    background: #0066cc;
+    color: white;
+    border: none;
+    padding: 0.6rem 1.2rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 0.9rem;
+  }
+
+  .btn:disabled {
+    background: #999;
+    cursor: not-allowed;
+  }
+
+  .btn-success {
+    background: #28a745;
+  }
+
+  textarea,
+  input[type="text"] {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+    margin-top: 0.25rem;
+    font-family: monospace;
+    font-size: 0.85rem;
+  }
+
+  .chat-box {
+    height: 180px;
+    border: 1px solid #eee;
+    background: #f9f9f9;
+    overflow-y: auto;
+    padding: 0.5rem;
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+  }
+
+  .msg {
+    margin-bottom: 0.4rem;
+  }
+
+  .msg-you {
+    color: #0066cc;
+  }
+
+  .msg-peer {
+    color: #28a745;
+  }
+
+  .chat-input {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .hidden {
+    display: none !important;
+  }
+
+  hr {
+    border: 0;
+    border-top: 1px solid #eee;
+    margin: 1rem 0;
+  }
+</style>
