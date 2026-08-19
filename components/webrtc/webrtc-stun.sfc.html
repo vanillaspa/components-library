@@ -1,0 +1,202 @@
+<script>
+    function applyStunConfig() {
+        const stunInput = shadowDocument.querySelector("#stunUrls").value.trim();
+        const urls = stunInput.split("\n").map(u => u.trim()).filter(Boolean);
+        const serverList = urls.map(url => ({ urls: url }));
+
+        Stun.setIceServers(serverList);
+        alert(`Applied ${serverList.length} STUN/TURN server(s).`);
+    }
+
+    function initializeWithOffer() {
+        Stun.initializeWithOffer();
+    }
+
+    function initializeWithAnswer() {
+        try {
+            const text = JSON.parse(shadowDocument.querySelector("#app").value);
+            Stun.initializeWithAnswer(text);
+        } catch (err) {
+            alert('Invalid JSON in textarea!');
+        }
+    }
+
+    function setSDP() {
+        try {
+            const text = JSON.parse(shadowDocument.querySelector("#app").value);
+            Stun.setSDP(text);
+        } catch (err) {
+            alert('Invalid JSON in textarea!');
+        }
+    }
+
+    function sendToRemote() {
+        try {
+            const text = JSON.parse(shadowDocument.querySelector("#app").value);
+            Stun.sendToRemote(text);
+        } catch (err) {
+            alert('Invalid JSON in textarea!');
+        }
+    }
+
+    shadowDocument.querySelector("#applyStunServers").addEventListener("click", applyStunConfig);
+    shadowDocument.querySelector("#initializeWithOffer").addEventListener("click", initializeWithOffer);
+    shadowDocument.querySelector("#initializeWithAnswer").addEventListener("click", initializeWithAnswer);
+    shadowDocument.querySelector("#setSDP").addEventListener("click", setSDP);
+    shadowDocument.querySelector("#sendToRemote").addEventListener("click", sendToRemote);
+</script>
+
+<style>
+    .stun-container {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        max-width: 700px;
+        margin: 20px auto;
+        padding: 20px;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        background-color: #ffffff;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+
+    .panel {
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 6px;
+        padding: 15px;
+        margin-bottom: 15px;
+    }
+
+    .panel h4 {
+        margin-top: 0;
+        margin-bottom: 10px;
+        color: #212529;
+    }
+
+    .stun-textarea {
+        width: 100%;
+        height: 60px;
+        font-family: monospace;
+        font-size: 0.85rem;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        padding: 8px;
+        box-sizing: border-box;
+    }
+
+    .app-textarea {
+        width: 100%;
+        height: 120px;
+        font-family: monospace;
+        font-size: 0.85rem;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        padding: 8px;
+        box-sizing: border-box;
+        resize: vertical;
+    }
+
+    .btn-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 10px;
+    }
+
+    .btn {
+        padding: 8px 14px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #fff;
+        background-color: #0d6efd;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    .btn:hover {
+        background-color: #0b5ed7;
+    }
+
+    .btn-secondary {
+        background-color: #6c757d;
+    }
+
+    .btn-secondary:hover {
+        background-color: #5c636a;
+    }
+
+    .status-badge {
+        display: inline-block;
+        padding: 4px 8px;
+        font-size: 0.75rem;
+        font-weight: bold;
+        border-radius: 4px;
+        background-color: #e0e0e0;
+        color: #333;
+    }
+
+    .status-connected,
+    .status-completed {
+        background-color: #d1e7dd;
+        color: #0f5132;
+    }
+
+    .status-checking {
+        background-color: #fff3cd;
+        color: #664d03;
+    }
+
+    .status-failed,
+    .status-disconnected {
+        background-color: #f8d7da;
+        color: #842029;
+    }
+
+    .stats-box {
+        font-family: monospace;
+        font-size: 0.8rem;
+        color: #495057;
+        line-height: 1.6;
+    }
+</style>
+
+<template>
+    <div class="stun-container">
+        <h2>STUN Peer-to-Peer Connection Manager</h2>
+
+        <!-- STUN/TURN Configuration Panel -->
+        <div class="panel">
+            <h4>1. STUN / TURN Server Configuration</h4>
+            <textarea id="stunUrls" class="stun-textarea" placeholder="One URL per line...">stun:stun.l.google.com:19302
+stun:stun1.l.google.com:19302</textarea>
+            <div class="btn-group">
+                <button class="btn btn-secondary" id="applyStunServers">Apply STUN Servers</button>
+            </div>
+        </div>
+
+        <!-- Connection Status & ICE Stats Panel -->
+        <div class="panel">
+            <h4>2. ICE Connection Status: <span id="connStateBadge" class="status-badge">NEW</span></h4>
+            <div id="connectionStats" class="stats-box">
+                <em>Waiting for connection to monitor candidate pairs and RTT...</em>
+            </div>
+        </div>
+
+        <!-- Peer Connection Controls -->
+        <div class="panel">
+            <h4>3. Peer Connection Exchange</h4>
+            <p style="font-size: 0.85rem; color: #6c757d;">Open this page in two tabs (A and B) to establish the peer
+                connection:</p>
+
+            <textarea id="app" class="app-textarea"
+                placeholder="Offer/Answer SDP or JSON message payload..."></textarea>
+
+            <div class="btn-group">
+                <button class="btn" id="initializeWithOffer">Step 1 (A): Create Offer</button>
+                <button class="btn" id="initializeWithAnswer">Step 2 (B): Create Answer</button>
+                <button class="btn" id="setSDP">Step 3 (A): Set Remote</button>
+                <button class="btn btn-secondary" id="sendToRemote">Send Payload</button>
+            </div>
+        </div>
+    </div>
+</template>
