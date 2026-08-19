@@ -9,7 +9,7 @@ var statsInterval = null;
 
 export function setIceServers(serverList) {
     iceServers = serverList;
-    log('Updated STUN/TURN servers configuration:', iceServers);
+    console.log('Updated STUN/TURN servers configuration:', iceServers);
 }
 
 function _updateUIOutput(data) {
@@ -58,11 +58,11 @@ function _updateConnectionBadge(state) {
 function _setupDataChannelEvents() {
     if (!dataChannel) return;
 
-    dataChannel.onopen = () => log('Data Channel OPENED.');
-    dataChannel.onclose = () => log('Data Channel CLOSED.');
-    dataChannel.onerror = (err) => error('Data Channel Error:', err);
+    dataChannel.onopen = () => console.log('Data Channel OPENED.');
+    dataChannel.onclose = () => console.log('Data Channel CLOSED.');
+    dataChannel.onerror = (err) => console.error('Data Channel Error:', err);
     dataChannel.onmessage = (event) => {
-        log('Received message from Remote Peer:', event.data);
+        console.log('Received message from Remote Peer:', event.data);
         alert(`[Remote Message Received]:\n${event.data}`);
     };
 }
@@ -121,7 +121,7 @@ function _stopStatsMonitoring() {
 
 export async function initializeWithOffer() {
     try {
-        log('Initializing Peer A with Offer...');
+        console.log('Initializing Peer A with Offer...');
         _createPeerConnection();
 
         dataChannel = peerConnection.createDataChannel('chat');
@@ -135,34 +135,34 @@ export async function initializeWithOffer() {
 
         console.log(peerConnection.localDescription);
     } catch (err) {
-        error('Failed to create Offer:', err);
+        console.error('Failed to create Offer:', err);
     }
 }
 
 export async function initializeWithAnswer(offerSDP) {
     try {
-        log('Initializing Peer B with Answer...');
+        console.log('Initializing Peer B with Answer...');
         _createPeerConnection();
 
         await peerConnection.setRemoteDescription(new RTCSessionDescription(offerSDP));
         const answer = await peerConnection.createAnswer();
         await peerConnection.setLocalDescription(answer);
 
-        log('Gathering STUN/ICE candidates...');
+        console.log('Gathering STUN/ICE candidates...');
         await _waitForIceGathering();
 
         console.log(peerConnection.localDescription);
     } catch (err) {
-        error('Failed to create Answer:', err);
+        console.error('Failed to create Answer:', err);
     }
 }
 
 export async function setSDP(answerSDP) {
     try {
-        log('Setting Remote Answer...');
+        console.log('Setting Remote Answer...');
         await peerConnection.setRemoteDescription(new RTCSessionDescription(answerSDP));
     } catch (err) {
-        error('Failed to set Remote SDP:', err);
+        console.error('Failed to set Remote SDP:', err);
     }
 }
 
@@ -173,9 +173,9 @@ export function sendToRemote(message) {
         }
         const payload = typeof message === 'string' ? message : JSON.stringify(message);
         dataChannel.send(payload);
-        log('Sent message:', payload);
+        console.log('Sent message:', payload);
     } catch (err) {
-        error('Failed to send message:', err);
+        console.error('Failed to send message:', err);
     }
 }
 
