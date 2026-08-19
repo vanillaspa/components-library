@@ -55,7 +55,6 @@
 </template>
 
 <script>
-
   var pc = null;
   var dataChannel = null;
   var rtcConfig = {
@@ -65,13 +64,15 @@
     ]
   };
 
-  bindEvents();
-  checkConsent();
-
   // Shadow DOM Query Helper
   function $(selector) {
     return shadowDocument.querySelector(selector);
   }
+
+  // Event-Listener beim Laden und bei Hash-Änderungen
+  bindEvents();
+  checkConsent();
+  window.addEventListener('hashchange', () => checkHash());
 
   function bindEvents() {
     $('#consentBtn').addEventListener('click', () => grantConsent());
@@ -98,8 +99,10 @@
   function showApp() {
     $('#consentBanner').classList.add('hidden');
     $('#appContent').classList.remove('hidden');
+    checkHash();
+  }
 
-    // Automatisches Erkennen eines eingehenden Links
+  function checkHash() {
     const hash = window.location.hash;
     if (hash.startsWith('#offer=')) {
       handleIncomingOffer(hash.replace('#offer=', ''));
@@ -137,7 +140,7 @@
   async function createOffer() {
     const btn = $('#createOfferBtn');
     btn.disabled = true;
-    btn.textContent = 'Generiere...';
+    btn.textContent = 'Generiere ICE Candidates...';
 
     pc = new RTCPeerConnection(rtcConfig);
     const channel = pc.createDataChannel('chat');
@@ -154,45 +157,69 @@
     $('#offerLink').value = url;
     $('#offerOutput').classList.remove('hidden');
     btn.textContent = 'Link generiert!';
+    btn.disabled = false;
   }
 
   async function handleIncomingOffer(compressedOffer) {
-    $('#hostSection').classList.add('hidden');
-    $('#joinSection').classList.remove('hidden');
+    try {
+      $('#hostSection').classList.add('hidden');
+      $('#joinSection').classList.remove('hidden');
 
-    pc = new RTCPeerConnection(rtcConfig);
-    pc.ondatachannel = (e) => setupDataChannel(e.channel);
+      pc = new RTCPeerConnection(rtcConfig);
+      pc.ondatachannel = (e) => setupDataChannel(e.channel);
 
-    const offerDesc = JSON.parse(await decompressText(compressedOffer));
-    await pc.setRemoteDescription(offerDesc);
+      const offerDesc = JSON.parse(await decompressText(compressedOffer));
+      await pc.setRemoteDescription(offerDesc);
 
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
 
-    await waitForIceGathering();
+      await waitForIceGathering();
 
-    const compressedAnswer = await compressText(JSON.stringify(pc.localDescription));
-    const url = `${window.location.origin}${window.location.pathname}#answer=${compressedAnswer}`;
+      const compressedAnswer = await compressText(JSON.stringify(pc.localDescription));
+      const url = `${window.location.origin}${window.location.pathname}#answer=${compressedAnswer}`;
 
-    $('#answerLink').value = url;
+      $('#answerLink').value = url;
+    } catch (err) {
+      console.error('Fehler beim Verarbeiten des Offers:', err);
+      alert('Ungültiger oder beschädigter Offer-Link!');
+    }
   }
 
   async function acceptAnswer() {
-    const input = $('#answerInput').value.trim();
-    const match = input.match(/#answer=(.+)$/);
-    if (!match) return alert('Ungültiger Antwort-Link!');
+    try {
+      const input = $('#answerInput').value.trim();
+      let compressedAnswer = input;
 
-    const answerDesc = JSON.parse(await decompressText(match[1]));
-    await pc.setRemoteDescription(answerDesc);
+      if (input.includes('#answer=')) {
+        compressedAnswer = input.split('#answer=')[1];
+      }
+
+      if (!compressedAnswer) return alert('Bitte gültigen Antwort-Link einfügen!');
+
+      const answerDesc = JSON.parse(await decompressText(compressedAnswer));
+      await pc.setRemoteDescription(answerDesc);
+    } catch (err) {
+      console.error('Fehler beim Setzen der Answer:', err);
+      alert('Fehler beim Verbindungsaufbau: Ungültiger Answer-Code!');
+    }
   }
 
+  // WICHTIG: Korrigiertes ICE-Gathering über EventListener
   function waitForIceGathering() {
     return new Promise((resolve) => {
-      if (pc.iceGatheringState === 'complete') resolve();
-      else {
-        pc.onicecandidate = (e) => {
-          if (!e.candidate) resolve();
+      if (pc.iceGatheringState === 'complete') {
+        resolve();
+      } else {
+        const checkState = () => {
+          if (pc.iceGatheringState === 'complete') {
+            pc.removeEventListener('icegatheringstatechange', checkState);
+            resolve();
+          }
         };
+        pc.addEventListener('icegatheringstatechange', checkState);
+        // Fallback-Timeout (5 Sekunden) falls ein STUN-Server nicht antwortet
+        setTimeout(resolve, 5000);
       }
     });
   }
@@ -214,7 +241,6 @@
     box.appendChild(div);
     box.scrollTop = box.scrollHeight;
   }
-
 </script>
 
 
